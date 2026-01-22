@@ -1,0 +1,9 @@
+You can see in the directory that there is the Fixing Traffic simulation issues.md. That's the chat history we had and the traffix game outline.md is the outline for this game. we are currently working on it let's get back on it. You can also see in the traffix folder there is all the things inside. Let's just start, ask me if you have any questions. Continuing from before:
+
+INcrease the range that the car can spawn, right now they spawn very slowly (almonst not spawning). 5x is probably not enough increase the scroll bar or something. You might have messed with the controls so that it's way slower now than before, previously it was way faster. 
+
+A few other thing I want you to fix. 
+
+First of all, previously the round robin traffic light system has been implemented, but it has been hardcoded in. I don't like that, And the game shouldn't be like that. I want each intersection to have a separate section unlike currently which is organized by light. Right now each intersection will have its own section and control panel basically. In that control panel I can select what is the order and time of each traffic light firing. Both red, green, and blue. Maybe something like the programming language scratch you know. I can say north green, south green wait 5 seconds. north yellow, south yellow, wait 1 second, north red, south red, wait 1 second. I can adjust each of this part to see if I want the all red timer or not. All of these can be implemented. I myself cna control how long is the traffic light and all of these. If you get what I mean. 
+
+Also why is there weird grey boxes and blue boxes placed weirdly. Lke there are 2 grey boxes placed in the middle of the road, and on each entrance and exit, grey boxes and blue boxes are also not placed the same some like a tetris shape, some is like grey blue blue grey. Please fix that. i don't know fi that affects the game but I feel like it does.
