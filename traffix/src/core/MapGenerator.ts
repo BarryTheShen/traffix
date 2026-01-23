@@ -185,40 +185,66 @@ export class MapGenerator {
             }
         });
 
+        const nodes = new Set<string>();
+        activeEdges.forEach(e => { nodes.add(`${e.n1.x},${e.n1.y}`); nodes.add(`${e.n2.x},${e.n2.y}`); });
+
+        // Identify which nodes are connected to entrances
+        const entranceConnections = new Map<string, number>();
+        nodes.forEach(s => {
+            const [x, y] = s.split(',').map(Number);
+            let count = 0;
+            if (x === 15 || x === 65 || y === 10 || y === 30) {
+                count = 1; // Each of these is an anchor on the boundary of the internal network
+            }
+            entranceConnections.set(s, count);
+        });
+
+        // Add internal roads with extra length for intersection overlap
         activeEdges.forEach(e => {
             if (e.n1.x === e.n2.x) {
-                this.addRoad(grid, 'y', e.n1.x, 2, Math.min(e.n1.y, e.n2.y), Math.max(e.n1.y, e.n2.y));
+                this.addRoad(grid, 'y', e.n1.x, 2, Math.min(e.n1.y, e.n2.y) - 5, Math.max(e.n1.y, e.n2.y) + 5);
             } else {
-                this.addRoad(grid, 'x', e.n1.y, 2, Math.min(e.n1.x, e.n2.x), Math.max(e.n1.x, e.n2.x));
+                this.addRoad(grid, 'x', e.n1.y, 2, Math.min(e.n1.x, e.n2.x) - 5, Math.max(e.n1.x, e.n2.x) + 5);
             }
         });
 
-        // Entrance segments (dedicated segments connecting edges to junctions)
-        const nodes = new Set<string>();
-        activeEdges.forEach(e => { nodes.add(`${e.n1.x},${e.n1.y}`); nodes.add(`${e.n2.x},${e.n2.y}`); });
-        
+        // Add entrance segments that overlap with internal nodes
         nodes.forEach(s => {
             const [x, y] = s.split(',').map(Number);
-            if (x === 15) this.addRoad(grid, 'x', y, 2, 0, 15);
-            if (x === 65) this.addRoad(grid, 'x', y, 2, 65, width);
-            if (y === 10) this.addRoad(grid, 'y', x, 2, 0, 10);
-            if (y === 30) this.addRoad(grid, 'y', x, 2, 30, height);
+            if (x === 15) this.addRoad(grid, 'x', y, 2, 0, 15 + 5);
+            if (x === 65) this.addRoad(grid, 'x', y, 2, 65 - 5, width);
+            if (y === 10) this.addRoad(grid, 'y', x, 2, 0, 10 + 5);
+            if (y === 30) this.addRoad(grid, 'y', x, 2, 30 - 5, height);
         });
 
         const intersections: {x: number, y: number}[] = [];
         nodes.forEach(s => {
             const [nx, ny] = s.split(',').map(Number);
-            const connections = activeEdges.filter(e => 
+            const connEdges = activeEdges.filter(e => 
                 (e.n1.x === nx && e.n1.y === ny) || (e.n2.x === nx && e.n2.y === ny)
             );
+            const internalConnections = connEdges.length;
+            const totalConnections = internalConnections + (entranceConnections.get(s) || 0);
             
-            let isJunction = connections.length >= 3;
-            if (connections.length === 2) {
-                const e1 = connections[0];
-                const e2 = connections[1];
-                const isStraightX = e1.n1.y === e1.n2.y && e2.n1.y === e2.n2.y;
-                const isStraightY = e1.n1.x === e1.n2.x && e2.n1.x === e2.n2.x;
-                if (!isStraightX && !isStraightY) isJunction = true;
+            let isJunction = totalConnections >= 3;
+            if (totalConnections === 2) {
+                const hasEntranceX = (nx === 15 || nx === 65);
+                const hasEntranceY = (ny === 10 || ny === 30);
+                
+                let isStraight = false;
+                if (internalConnections === 2) {
+                    const e1 = connEdges[0];
+                    const e2 = connEdges[1];
+                    const isStraightX = e1.n1.y === e1.n2.y && e2.n1.y === e2.n2.y;
+                    const isStraightY = e1.n1.x === e1.n2.x && e2.n1.x === e2.n2.x;
+                    isStraight = isStraightX || isStraightY;
+                } else if (internalConnections === 1) {
+                    const e1 = connEdges[0];
+                    if (hasEntranceX && e1.n1.y === e1.n2.y) isStraight = true;
+                    if (hasEntranceY && e1.n1.x === e1.n2.x) isStraight = true;
+                }
+
+                if (!isStraight) isJunction = true;
             }
 
             if (isJunction) {

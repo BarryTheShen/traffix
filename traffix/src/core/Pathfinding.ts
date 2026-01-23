@@ -69,10 +69,40 @@ export class Pathfinding {
                     // 1. Basic Connectivity
                     const roadTypes = ['road', 'entry', 'exit'];
                     if (roadTypes.includes(currentCell.type)) {
-                        if (!currentCell.allowedDirections.includes(moveDir)) canMove = false;
+                        // Allow movement in primary direction
+                        if (currentCell.allowedDirections.includes(moveDir)) {
+                            canMove = true;
+                        } 
+                        // ALSO allow lane switching (perpendicular to primary direction)
+                        else if (!ignoreLaneRules) {
+                            const primaryDir = currentCell.allowedDirections[0];
+                            const isPerpendicular = 
+                                ((primaryDir === 'NORTH' || primaryDir === 'SOUTH') && (moveDir === 'EAST' || moveDir === 'WEST')) ||
+                                ((primaryDir === 'EAST' || primaryDir === 'WEST') && (moveDir === 'NORTH' || moveDir === 'SOUTH'));
+                            
+                            if (isPerpendicular) {
+                                // Only allow switching to another road cell of the same primary direction
+                                if (targetCell.type === 'road' && targetCell.allowedDirections.includes(primaryDir)) {
+                                    canMove = true;
+                                } else {
+                                    canMove = false;
+                                }
+                            } else {
+                                canMove = false;
+                            }
+                        } else {
+                            canMove = false;
+                        }
                     }
-                    if (roadTypes.includes(targetCell.type)) {
-                        if (!targetCell.allowedDirections.includes(moveDir)) canMove = false;
+                    if (canMove && roadTypes.includes(targetCell.type)) {
+                        if (!targetCell.allowedDirections.includes(moveDir)) {
+                            // Similar logic for target cell
+                             const targetPrimary = targetCell.allowedDirections[0];
+                             const isPerp = 
+                                ((targetPrimary === 'NORTH' || targetPrimary === 'SOUTH') && (moveDir === 'EAST' || moveDir === 'WEST')) ||
+                                ((targetPrimary === 'EAST' || targetPrimary === 'WEST') && (moveDir === 'NORTH' || moveDir === 'SOUTH'));
+                             if (!isPerp && !ignoreLaneRules) canMove = false;
+                        }
                     }
 
                     // 2. Lane Discipline
@@ -99,16 +129,12 @@ export class Pathfinding {
                         }
                     }
 
-                    // 3. NO ZIG-ZAG IN INTERSECTION
-                    if (canMove && !ignoreLaneRules && currentCell.type === 'intersection' && targetCell.type === 'intersection') {
-                        const entryInfo = this.findIntersectionEntry(node, grid);
-                        if (entryInfo) {
-                            // Must continue in the same direction we entered
-                            if (moveDir !== entryInfo.direction) {
-                                canMove = false;
-                            }
-                        }
-                    }
+                    /* 
+                       Removed Rule 3: NO ZIG-ZAG IN INTERSECTION
+                       This rule was too restrictive for 4x4 intersections, 
+                       preventing cars from ever making turns.
+                       Lane discipline (Rule 2) already handles valid turn lanes.
+                    */
 
                     if (canMove) {
                         neighbors.push({ x: nx, y: ny });

@@ -1,4 +1,4 @@
-import type { GridCell, Vector2D } from '../core/types';
+import type { GridCell, Vector2D, Direction } from '../core/types';
 import type { TrafficLight } from './TrafficLight';
 import { Pathfinding } from '../core/Pathfinding';
 
@@ -9,10 +9,11 @@ export class Car {
     public velocity: number = 0;
     public maxVelocity: number = 0.5;
     public acceleration: number = 0.02;
-    public deceleration: number = 0.05;
+    public deceleration: number = 0.1;
     public path: Vector2D[] = [];
     public currentTargetIndex: number = 0;
     public debugState: string = 'IDLE';
+    public limitReason: string = 'NONE';
     public stuckTimer: number = 0;
     public spawnStuckTimer: number = 0;
     public reactionTimer: number = 0;
@@ -23,18 +24,24 @@ export class Car {
     public isCollided: boolean = false;
     public collisionTimer: number = 0;
     public violatesRules: boolean = false;
+    public isWaiting: boolean = false;
+    public lifeTicks: number = 0;
 
-    private lastObstacleId: string | null = null;
+    public lastObstacleId: string | null = null;
 
     constructor(id: string, startPos: Vector2D) {
         this.id = id;
         this.position = { ...startPos };
         this.startPos = { ...startPos };
-        this.maxVelocity = 0.4 + Math.random() * 0.3;
-        this.perceptionDelay = 10 + Math.floor(Math.random() * 10);
+        this.maxVelocity = 0.4 + Math.random() * 0.1;
+        this.perceptionDelay = 10;
     }
 
-    public update(lights: TrafficLight[], otherCars: Car[], grid: GridCell[][], timeScale: number = 1.0, instantPhysics: boolean = false) {
+    public update(lights: TrafficLight[], otherCars: Car[], grid: GridCell[][], timeScale: number = 1.0) {
+        this.isWaiting = false;
+        this.limitReason = 'CRUISING';
+        this.lifeTicks++;
+        
         if (this.isCollided) {
             this.collisionTimer++;
             this.velocity = 0;
@@ -44,241 +51,178 @@ export class Car {
 
         if (this.laneChangeCooldown > 0) this.laneChangeCooldown--;
 
+        this.advanceWaypointsStrict();
         if (this.currentTargetIndex >= this.path.length) {
             this.debugState = 'ARRIVED';
+            this.velocity = 0;
             return;
         }
 
         const target = this.path[this.currentTargetIndex];
-        const dx = target.x - this.position.x;
-        const dy = target.y - this.position.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const dxT = target.x - this.position.x, dyT = target.y - this.position.y;
+        const distToT = Math.sqrt(dxT*dxT + dyT*dyT);
+        const ux = distToT > 0.01 ? dxT / distToT : 0;
+        const uy = distToT > 0.01 ? dyT / distToT : 0;
 
-        const currentMaxVel = this.maxVelocity * timeScale;
-        const baseAcc = this.acceleration * timeScale;
-        const baseDecel = this.deceleration * timeScale;
-        
-        // 0. Physical Collision Detection
-        for (const other of otherCars) {
-            if (other.id === this.id || other.isCollided) continue;
-            const odx = other.position.x - this.position.x;
-            const ody = other.position.y - this.position.y;
-            const distSq = odx * odx + ody * ody;
-            
-            if (distSq < 0.64) { // dist < 0.8
-                this.isCollided = true;
-                other.isCollided = true;
-                return;
-            }
-        }
-
-        if (distance < Math.max(0.1, this.velocity)) {
-            this.position.x = target.x;
-            this.position.y = target.y;
-            this.currentTargetIndex++;
-            return;
-        }
-
-        const dxN = dx / distance;
-        const dyN = dy / distance;
-
-        // 2. Perception & Lookahead
         let limitDist = Infinity;
-        let limitReason = 'CRUISING';
-        let currentObstacleId: string | null = null;
-        let obstacleVelocity = 0;
+        let obstacleVel = 0;
+        let obstacleId: string | null = null;
 
         const gx = Math.floor(this.position.x);
         const gy = Math.floor(this.position.y);
         const currentCell = grid[gy]?.[gx];
 
-        // A. Lights Check
         if (currentCell?.type !== 'intersection') {
-            const light = this.getNearestLight(lights, dxN, dyN);
-            if (light) {
-                const dist = Math.sqrt((light.position.x - this.position.x)**2 + (light.position.y - this.position.y)**2);
-                
-                if (light.state === 'RED') {
-                    currentObstacleId = light.id;
-                    const stopDist = Math.max(0, dist - 1.0);
-                    if (stopDist < limitDist) {
-                        limitDist = stopDist;
-                        limitReason = 'RED_LIGHT';
-                        obstacleVelocity = 0;
-                    }
-                } else if (light.state === 'YELLOW') {
-                    // YELLOW logic: commit if stopping distance is too long
-                    const requiredDecel = (this.velocity * this.velocity) / (2 * Math.max(0.1, dist - 1.0));
-                    if (requiredDecel > baseDecel * 3) {
-                        // Pass!
-                    } else {
-                        currentObstacleId = light.id;
-                        limitDist = Math.max(0, dist - 1.0);
-                        limitReason = 'YELLOW_LIGHT';
-                        obstacleVelocity = 0;
-                    }
-                }
+            const light = this.getNearestLight(lights, ux, uy);
+            if (light && light.state !== 'GREEN') {
+                const dToL = Math.sqrt((light.position.x - this.position.x)**2 + (light.position.y - this.position.y)**2);
+                limitDist = dToL - 0.8; 
+                this.limitReason = 'RED_LIGHT';
+                obstacleId = light.id;
+                this.isWaiting = true;
             }
         }
 
-        // B. Cars Check (Predictive)
-        const carInfo = this.getNearestCarDistance(otherCars, dxN, dyN);
-        if (carInfo) {
-            const stopDist = Math.max(0, carInfo.dist - 1.2);
-            if (stopDist < limitDist) {
-                limitDist = stopDist;
-                limitReason = 'CAR_AHEAD';
-                currentObstacleId = carInfo.id;
-                obstacleVelocity = carInfo.velocity;
-                
-                if (this.laneChangeCooldown === 0 && this.velocity < 0.2 && this.destination) {
-                    this.tryOvertake(grid, otherCars, dxN, dyN);
-                }
-            }
+        const leadCar = this.getLeadVehicleAdvanced(otherCars);
+        if (leadCar && leadCar.dist < limitDist) {
+            limitDist = leadCar.dist - 1.5; 
+            this.limitReason = 'CAR_AHEAD';
+            obstacleVel = leadCar.velocity;
+            obstacleId = leadCar.id;
+            const other = otherCars.find(c => c.id === leadCar.id);
+            if (other && (other.isWaiting || other.velocity < 0.05 || other.isCollided)) this.isWaiting = true;
         }
 
-        // 3. Reaction Timer Logic
-        if (currentObstacleId !== this.lastObstacleId) {
-            this.lastObstacleId = currentObstacleId;
-            if (currentObstacleId !== null) {
+        if (obstacleId !== this.lastObstacleId) {
+            if (this.velocity < 0.01 && this.lastObstacleId !== null && obstacleId === null) {
                 this.reactionTimer = this.perceptionDelay;
             }
+            this.lastObstacleId = obstacleId;
         }
 
-        // 4. Physics Engine
-        if (instantPhysics) {
-            if (limitDist < 0.5) {
-                this.velocity = 0;
-                this.debugState = `INSTANT_STOP (${limitReason})`;
-            } else {
-                this.velocity = currentMaxVel;
-                this.debugState = 'INSTANT_ACCEL';
-            }
-        } else {
-            // BRICK WALL for Red Light at close range
-            if (limitReason === 'RED_LIGHT' && limitDist < 0.2) {
-                this.velocity = 0;
-                this.debugState = 'STOPPED (RED_WALL)';
-            } else if (this.reactionTimer > 0 && limitDist < Infinity && this.velocity > 0.1 && limitReason !== 'CAR_AHEAD') {
-                this.reactionTimer--;
-                this.velocity = Math.min(this.velocity + baseAcc, currentMaxVel);
-                this.debugState = 'REACTING...';
-            } else {
-                const relativeVel = this.velocity - obstacleVelocity;
-                const maxNormalDecel = baseDecel * 2;
-                const maxPanicDecel = baseDecel * 10;
+        const baseAcc = this.acceleration * timeScale;
+        const baseDecel = this.deceleration * timeScale;
 
-                if (limitDist < Infinity) {
-                    if (limitDist < 0.1) {
-                        this.velocity = 0;
-                        this.debugState = `STOPPED (${limitReason})`;
-                        if (this.reactionTimer === 0) this.reactionTimer = this.perceptionDelay;
-                    } else if (relativeVel > 0) {
-                        const requiredDecel = (relativeVel * relativeVel) / (2 * limitDist);
-                        const appliedDecel = Math.min(requiredDecel * 1.2, maxPanicDecel);
-                        
-                        if (requiredDecel > maxNormalDecel * 0.8) {
-                            this.velocity = Math.max(0, this.velocity - appliedDecel);
-                            this.debugState = `BRAKING (${limitReason})`;
-                        } else {
-                            this.velocity = Math.min(this.velocity + baseAcc, currentMaxVel);
-                            this.debugState = 'COASTING';
-                        }
-                    } else {
-                        this.velocity = Math.min(this.velocity + baseAcc, currentMaxVel, obstacleVelocity + 0.05);
-                        this.debugState = 'FOLLOWING';
-                    }
+        if (this.reactionTimer > 0) {
+            this.reactionTimer--;
+            this.velocity = Math.max(0, this.velocity - baseDecel);
+            this.debugState = 'REACTING';
+        } else if (limitDist < Infinity) {
+            const targetGap = 0.5;
+            if (limitDist <= 0.01) {
+                this.velocity = 0;
+                this.debugState = 'STOPPED';
+            } else {
+                const v_diff = this.velocity - obstacleVel;
+                const brakingDist = v_diff > 0 ? (v_diff * v_diff) / (2 * baseDecel) : 0;
+                const safetyBuffer = (this.velocity * 5); 
+                
+                if (limitDist < brakingDist + safetyBuffer + 0.05) {
+                    const neededDecel = v_diff > 0 ? (v_diff * v_diff) / (2 * Math.max(0.01, limitDist)) : baseDecel;
+                    const applied = Math.min(Math.max(neededDecel * 1.1, baseDecel), baseDecel * 10);
+                    this.velocity = Math.max(obstacleVel, this.velocity - applied);
+                    this.debugState = 'BRAKING';
                 } else {
-                    this.velocity = Math.min(this.velocity + baseAcc, currentMaxVel);
-                    this.debugState = 'ACCEL';
+                    const targetVel = Math.min(this.maxVelocity * timeScale, obstacleVel + (limitDist * 0.5));
+                    if (this.velocity < targetVel) {
+                        this.velocity = Math.min(this.velocity + baseAcc, targetVel);
+                        this.debugState = 'FOLLOWING';
+                    } else {
+                        this.velocity = Math.max(targetVel, this.velocity - baseDecel * 0.5);
+                        this.debugState = 'MATCHING';
+                    }
                 }
             }
+        } else {
+            this.velocity = Math.min(this.velocity + baseAcc, this.maxVelocity * timeScale);
+            this.debugState = 'ACCEL';
         }
 
-        // Stuck Detection
-        if (this.velocity < 0.05) {
+        if (this.velocity < 0.001) this.velocity = 0;
+
+        const moveDist = Math.min(this.velocity, distToT);
+        if (moveDist > 0) {
+            const nextX = this.position.x + ux * moveDist;
+            const nextY = this.position.y + uy * moveDist;
+            let blocked = false;
+            for (const other of otherCars) {
+                if (other.id === this.id) continue;
+                const dSq = (other.position.x - nextX)**2 + (other.position.y - nextY)**2;
+                if (dSq < 0.81) { 
+                    blocked = true;
+                    if (this.velocity > 0.1 && other.lifeTicks > 40) { this.isCollided = true; other.isCollided = true; }
+                    break;
+                }
+            }
+            if (!blocked) { this.position.x = nextX; this.position.y = nextY; }
+            else { this.velocity = 0; }
+        }
+
+        // --- SPAWN STUCK TRACKING ---
+        if (this.velocity < 0.01) {
             this.stuckTimer++;
-            const dxStart = Math.abs(this.position.x - this.startPos.x);
-            const dyStart = Math.abs(this.position.y - this.startPos.y);
-            const isNearStart = dxStart < 0.5 && dyStart < 0.5;
-            
-            if (currentCell?.type === 'entry' && isNearStart) {
+            const dSq = (this.position.x - this.startPos.x)**2 + (this.position.y - this.startPos.y)**2;
+            if (dSq < 4.0) { // Within 2.0 units
                 this.spawnStuckTimer++;
-            } else {
-                this.spawnStuckTimer = 0;
             }
         } else {
             this.stuckTimer = 0;
             this.spawnStuckTimer = 0;
         }
-
-        this.position.x += dxN * this.velocity;
-        this.position.y += dyN * this.velocity;
     }
 
-    private tryOvertake(grid: GridCell[][], cars: Car[], dxN: number, dyN: number) {
-        let lookAheadIdx = this.currentTargetIndex;
-        let distToCheck = 0;
-        let approachingIntersection = false;
-        while (lookAheadIdx < this.path.length && distToCheck < 5) {
-            const p = this.path[lookAheadIdx];
-            if (grid[p.y]?.[p.x]?.type === 'intersection') { approachingIntersection = true; break; }
-            distToCheck++; lookAheadIdx++;
-        }
-        if (approachingIntersection) return;
-
-        const offsets = [{ x: -dyN, y: dxN }, { x: dyN, y: -dxN }];
-        for (const off of offsets) {
-            const targetX = Math.round(this.position.x + off.x);
-            const targetY = Math.round(this.position.y + off.y);
-            if (targetX < 0 || targetX >= grid[0].length || targetY < 0 || targetY >= grid.length) continue;
-            const cell = grid[targetY][targetX];
-            if (cell.type !== 'road') continue;
-            if (!cell.allowedDirections.includes(this.getHeading(dxN, dyN))) continue;
-            const isBlocked = cars.some(c => c.id !== this.id && Math.abs(c.position.x - targetX) < 1.0 && Math.abs(c.position.y - targetY) < 1.0);
-            if (!isBlocked) {
-                const newPath = Pathfinding.findPath(grid, { x: targetX, y: targetY }, this.destination!, this.violatesRules);
-                if (newPath) {
-                    this.position.x = targetX; this.position.y = targetY;
-                    this.path = newPath; this.currentTargetIndex = 0;
-                    this.laneChangeCooldown = 120;
-                    return;
-                }
+    private getLeadVehicleAdvanced(others: Car[]): { dist: number, velocity: number, id: string } | null {
+        let dAccum = 0;
+        for (let i = this.currentTargetIndex; i < Math.min(this.path.length, this.currentTargetIndex + 10); i++) {
+            const p = this.path[i];
+            const prev = (i === this.currentTargetIndex) ? this.position : this.path[i-1];
+            dAccum += Math.sqrt((p.x - prev.x)**2 + (p.y - prev.y)**2);
+            if (dAccum > 15) break;
+            for (const other of others) {
+                if (other.id === this.id) continue;
+                const dx = other.position.x - p.x, dy = other.position.y - p.y;
+                if (dx*dx + dy*dy < 0.64) return { dist: dAccum, velocity: other.velocity, id: other.id };
             }
-        }
-    }
-
-    private getHeading(dx: number, dy: number): any {
-        if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'EAST' : 'WEST';
-        return dy > 0 ? 'SOUTH' : 'NORTH';
-    }
-
-    private getNearestLight(lights: TrafficLight[], dxN: number, dyN: number): TrafficLight | null {
-        for (const light of lights) {
-            if (light.state === 'GREEN') continue;
-            const ldx = light.position.x - this.position.x;
-            const ldy = light.position.y - this.position.y;
-            const dist = Math.sqrt(ldx * ldx + ldy * ldy);
-            if (dist > 15) continue; 
-            if (ldx * dxN + ldy * dyN > 0.95 && Math.abs(ldx * dyN - ldy * dxN) < 0.8) return light;
         }
         return null;
     }
 
-    private getNearestCarDistance(cars: Car[], dxN: number, dyN: number): { dist: number, id: string, velocity: number } | null {
-        let minDist = Infinity;
-        let foundCar: Car | null = null;
-        for (const other of cars) {
-            if (other.id === this.id) continue;
-            const cdx = other.position.x - this.position.x;
-            const cdy = other.position.y - this.position.y;
-            const dist = Math.sqrt(cdx * cdx + cdy * cdy);
-            if (dist > 15.0) continue;
-            
-            if (cdx * dxN + cdy * dyN > 0 && Math.abs(cdx * dyN - cdy * dxN) < 0.8) {
-                if (dist < minDist) { minDist = dist; foundCar = other; }
-            }
+    private advanceWaypointsStrict() {
+        if (this.currentTargetIndex >= this.path.length) return;
+        const target = this.path[this.currentTargetIndex];
+        const dx = target.x - this.position.x, dy = target.y - this.position.y;
+        if (dx*dx + dy*dy < 0.04) { this.currentTargetIndex++; return; }
+        if (dx*dx + dy*dy > 9.0) return;
+        const prev = (this.currentTargetIndex === 0) ? this.startPos : this.path[this.currentTargetIndex - 1];
+        const segX = target.x - prev.x, segY = target.y - prev.y;
+        const carToTargetX = target.x - this.position.x, carToTargetY = target.y - this.position.y;
+        if (segX * carToTargetX + segY * carToTargetY < 0) this.currentTargetIndex++;
+    }
+
+    private getNearestLight(lights: TrafficLight[], ux: number, uy: number): TrafficLight | null {
+        const heading = this.getHeading(ux, uy);
+        let best: TrafficLight | null = null;
+        let minDist = 10;
+        for (const l of lights) {
+            if (l.state === 'GREEN') continue;
+            const lParts = l.id.split('_');
+            const lDir = lParts[1].charAt(0); 
+            let relevant = false;
+            if (lDir === 'n' && heading === 'SOUTH') relevant = true;
+            if (lDir === 's' && heading === 'NORTH') relevant = true;
+            if (lDir === 'e' && heading === 'WEST') relevant = true;
+            if (lDir === 'w' && heading === 'EAST') relevant = true;
+            if (!relevant) continue;
+            const ldx = l.position.x - this.position.x, ldy = l.position.y - this.position.y;
+            const dot = ldx * ux + ldy * uy;
+            const cross = Math.abs(ldx * uy - ldy * ux);
+            if (dot > -0.2 && dot < minDist && cross < 1.0) { minDist = dot; best = l; }
         }
-        return foundCar ? { dist: minDist, id: foundCar.id, velocity: foundCar.isCollided ? 0 : foundCar.velocity } : null;
+        return best;
+    }
+
+    private getHeading(dx: number, dy: number): Direction {
+        if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'EAST' : 'WEST';
+        return dy > 0 ? 'SOUTH' : 'NORTH';
     }
 }

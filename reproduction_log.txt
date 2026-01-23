@@ -1,0 +1,317 @@
+
+[1m[46m RUN [49m[22m [36mv4.0.17 [39m[90m/home/barry/SourceGit/traffix[39m
+
+[90mstdout[2m | traffix/src/reproduce.test.ts[2m > [22m[2mreproduce gridlock
+[22m[39m--- REPRODUCTION ATTEMPT (10x Speed) ---
+Tick 200: 3 cars stuck.
+  Car car_1007_np7r9 at (19.2, 18.0) state: STOPPED (CAR_AHEAD) stuck: 319
+  Car car_1486_3ksx8 at (44.5, 8.0) state: STOPPED (CAR_AHEAD) stuck: 326
+  Car car_1614_awg2z at (35.0, 10.0) state: STOPPED (CAR_AHEAD) stuck: 304
+Tick 300: 6 cars stuck.
+  Car car_1523_s5dxl at (38.9, 21.0) state: STOPPED (CAR_AHEAD) stuck: 335
+  Car car_1715_wtl2i at (38.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 330
+  Car car_1817_fdkjb at (14.0, 38.0) state: STOPPED (CAR_AHEAD) stuck: 435
+  Car car_1939_fhew8 at (36.0, 21.0) state: FOLLOWING stuck: 397
+  Car car_2199_mwma7 at (13.0, 38.0) state: STOPPED (CAR_AHEAD) stuck: 435
+Tick 400: 27 cars stuck.
+  Car car_1086_ywxlm at (66.0, 10.0) state: STOPPED (CAR_AHEAD) stuck: 798
+  Car car_1565_1n30q at (15.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 317
+  Car car_1617_tb0sc at (64.0, 10.0) state: STOPPED (CAR_AHEAD) stuck: 575
+  Car car_1817_fdkjb at (14.0, 38.0) state: CRASHED stuck: 1202
+  Car car_2027_teb3z at (13.0, 36.8) state: STOPPED (CAR_AHEAD) stuck: 1156
+Tick 500: 80 cars stuck.
+  Car car_1086_ywxlm at (66.0, 10.0) state: CRASHED stuck: 1202
+  Car car_1565_1n30q at (15.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 314
+  Car car_1711_p3s85 at (39.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 355
+  Car car_1744_jk1um at (14.0, 24.7) state: STOPPED (CAR_AHEAD) stuck: 347
+  Car car_1786_auxqm at (63.0, 28.5) state: STOPPED (CAR_AHEAD) stuck: 353
+Tick 600: 156 cars stuck.
+  Car car_1235_q8bh6 at (31.1, 11.0) state: STOPPED (CAR_AHEAD) stuck: 605
+  Car car_1715_wtl2i at (63.0, 24.7) state: STOPPED (CAR_AHEAD) stuck: 457
+  Car car_1786_auxqm at (64.0, 29.0) state: STOPPED (CAR_AHEAD) stuck: 461
+  Car car_1852_j48j1 at (64.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 588
+  Car car_1918_ou34i at (16.3, 8.0) state: STOPPED (CAR_AHEAD) stuck: 355
+Tick 700: 212 cars stuck.
+  Car car_1240_25b8e at (34.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 611
+  Car car_1357_la68l at (40.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 318
+  Car car_1497_xis20 at (37.0, 18.0) state: STOPPED (CAR_AHEAD) stuck: 325
+  Car car_1711_p3s85 at (29.8, 18.0) state: STOPPED (CAR_AHEAD) stuck: 769
+  Car car_1744_jk1um at (15.0, 22.0) state: STOPPED (CAR_AHEAD) stuck: 329
+Tick 800: 234 cars stuck.
+  Car car_1240_25b8e at (34.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 711
+  Car car_1357_la68l at (40.0, 20.0) state: FOLLOWING stuck: 385
+  Car car_1617_tb0sc at (63.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 345
+  Car car_1711_p3s85 at (29.8, 18.0) state: STOPPED (CAR_AHEAD) stuck: 869
+  Car car_1757_c7zr5 at (32.0, 18.0) state: STOPPED (CAR_AHEAD) stuck: 845
+Tick 900: 236 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 350
+  Car car_1617_tb0sc at (63.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 444
+  Car car_1711_p3s85 at (29.8, 18.0) state: STOPPED (CAR_AHEAD) stuck: 969
+  Car car_1757_c7zr5 at (32.0, 18.0) state: STOPPED (CAR_AHEAD) stuck: 945
+  Car car_1786_auxqm at (66.0, 31.0) state: STOPPED (CAR_AHEAD) stuck: 436
+Tick 1000: 268 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 449
+  Car car_1617_tb0sc at (63.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 543
+  Car car_1711_p3s85 at (29.8, 18.0) state: STOPPED (CAR_AHEAD) stuck: 1069
+  Car car_1715_wtl2i at (64.0, 30.0) state: STOPPED (CAR_AHEAD) stuck: 361
+  Car car_1757_c7zr5 at (32.0, 18.0) state: STOPPED (CAR_AHEAD) stuck: 1045
+Tick 1100: 299 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 548
+  Car car_1329_dil69 at (24.2, 21.0) state: STOPPED (CAR_AHEAD) stuck: 307
+  Car car_1497_xis20 at (38.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 302
+  Car car_1617_tb0sc at (63.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 643
+  Car car_1685_1xa0x at (33.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 356
+Tick 1200: 356 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 648
+  Car car_1080_6rwew at (28.5, 11.0) state: STOPPED (CAR_AHEAD) stuck: 318
+  Car car_1617_tb0sc at (63.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 742
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 351
+  Car car_1665_ol09w at (47.5, 10.0) state: STOPPED (CAR_AHEAD) stuck: 325
+Tick 1300: 330 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 747
+  Car car_1617_tb0sc at (62.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 841
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 451
+  Car car_1665_ol09w at (47.5, 10.0) state: STOPPED (CAR_AHEAD) stuck: 425
+  Car car_1685_1xa0x at (33.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 554
+Tick 1400: 315 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 847
+  Car car_1617_tb0sc at (62.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 940
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 551
+  Car car_1665_ol09w at (47.5, 10.0) state: STOPPED (CAR_AHEAD) stuck: 525
+  Car car_1685_1xa0x at (33.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 654
+Tick 1500: 290 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 946
+  Car car_1329_dil69 at (24.1, 21.0) state: STOPPED (CAR_AHEAD) stuck: 306
+  Car car_1617_tb0sc at (62.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 1040
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 651
+  Car car_1665_ol09w at (47.5, 10.0) state: STOPPED (CAR_AHEAD) stuck: 625
+Tick 1600: 287 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 1046
+  Car car_1329_dil69 at (24.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 405
+  Car car_1497_xis20 at (38.0, 18.6) state: STOPPED (CAR_AHEAD) stuck: 357
+  Car car_1617_tb0sc at (62.0, 9.0) state: STOPPED (CAR_AHEAD) stuck: 1139
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 751
+Tick 1700: 275 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 1145
+  Car car_1329_dil69 at (24.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 505
+  Car car_1497_xis20 at (38.0, 18.6) state: STOPPED (CAR_AHEAD) stuck: 457
+  Car car_1617_tb0sc at (62.0, 9.0) state: CRASHED stuck: 1202
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 851
+Tick 1800: 253 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: CRASHED stuck: 1202
+  Car car_1329_dil69 at (24.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 604
+  Car car_1497_xis20 at (38.0, 18.6) state: STOPPED (CAR_AHEAD) stuck: 557
+  Car car_1523_s5dxl at (18.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 362
+  Car car_1617_tb0sc at (62.0, 9.0) state: CRASHED stuck: 1202
+Tick 1900: 223 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: CRASHED stuck: 1202
+  Car car_1329_dil69 at (24.0, 21.0) state: STOPPED (CAR_AHEAD) stuck: 702
+  Car car_1497_xis20 at (38.0, 18.6) state: STOPPED (CAR_AHEAD) stuck: 657
+  Car car_1617_tb0sc at (62.0, 9.0) state: CRASHED stuck: 1202
+  Car car_1638_w3p1b at (35.3, 21.0) state: STOPPED (CAR_AHEAD) stuck: 1051
+Tick 2000: 233 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: CRASHED stuck: 1202
+  Car car_1329_dil69 at (24.0, 21.0) state: CRASHED stuck: 749
+  Car car_1497_xis20 at (38.0, 18.6) state: STOPPED (CAR_AHEAD) stuck: 757
+  Car car_1617_tb0sc at (62.0, 9.0) state: CRASHED stuck: 1202
+  Car car_1638_w3p1b at (35.3, 21.0) state: CRASHED stuck: 1103
+Tick 2100: 233 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: CRASHED stuck: 1202
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 323
+  Car car_1329_dil69 at (24.0, 21.0) state: CRASHED stuck: 749
+  Car car_1497_xis20 at (38.0, 18.6) state: STOPPED (CAR_AHEAD) stuck: 857
+  Car car_1617_tb0sc at (62.0, 9.0) state: CRASHED stuck: 1202
+Tick 2200: 234 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: CRASHED stuck: 1202
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 423
+  Car car_1240_25b8e at (32.2, 9.0) state: STOPPED (CAR_AHEAD) stuck: 366
+  Car car_1329_dil69 at (24.0, 21.0) state: CRASHED stuck: 749
+  Car car_1565_1n30q at (34.7, 9.0) state: STOPPED (CAR_AHEAD) stuck: 362
+Tick 2300: 212 cars stuck.
+  Car car_1064_hz7hl at (42.0, 11.0) state: CRASHED stuck: 1202
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 523
+  Car car_1240_25b8e at (32.2, 9.0) state: STOPPED (CAR_AHEAD) stuck: 466
+  Car car_1329_dil69 at (24.0, 21.0) state: CRASHED stuck: 749
+  Car car_1357_la68l at (39.5, 21.0) state: STOPPED (CAR_AHEAD) stuck: 317
+Tick 2400: 180 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 623
+  Car car_1329_dil69 at (24.0, 21.0) state: CRASHED stuck: 749
+  Car car_1638_w3p1b at (35.3, 21.0) state: CRASHED stuck: 1103
+  Car car_1665_ol09w at (47.5, 10.0) state: CRASHED stuck: 1202
+  Car car_1685_1xa0x at (34.0, 21.0) state: CRASHED stuck: 1202
+Tick 2500: 155 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 723
+  Car car_1329_dil69 at (24.0, 21.0) state: CRASHED stuck: 749
+  Car car_1638_w3p1b at (35.3, 21.0) state: CRASHED stuck: 1103
+  Car car_1665_ol09w at (47.5, 10.0) state: CRASHED stuck: 1202
+  Car car_1685_1xa0x at (34.0, 21.0) state: CRASHED stuck: 1202
+Tick 2600: 138 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 823
+  Car car_1665_ol09w at (47.5, 10.0) state: CRASHED stuck: 1202
+  Car car_1705_tt8pa at (40.0, 17.0) state: STOPPED (CAR_AHEAD) stuck: 380
+  Car car_1773_k9zgm at (40.0, 15.0) state: STOPPED (CAR_AHEAD) stuck: 721
+  Car car_1830_wiqjc at (26.0, 11.0) state: CRASHED stuck: 1198
+Tick 2700: 103 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 923
+  Car car_1240_25b8e at (34.7, 10.0) state: STOPPED (CAR_AHEAD) stuck: 331
+  Car car_1705_tt8pa at (40.0, 17.0) state: STOPPED (CAR_AHEAD) stuck: 480
+  Car car_1773_k9zgm at (40.0, 15.0) state: STOPPED (CAR_AHEAD) stuck: 821
+  Car car_1830_wiqjc at (26.0, 11.0) state: CRASHED stuck: 1198
+Tick 2800: 107 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 1023
+  Car car_1705_tt8pa at (40.0, 17.0) state: STOPPED (CAR_AHEAD) stuck: 579
+  Car car_1773_k9zgm at (40.0, 15.0) state: STOPPED (CAR_AHEAD) stuck: 920
+  Car car_1830_wiqjc at (26.0, 11.0) state: CRASHED stuck: 1198
+  Car car_2148_ioidk at (28.0, 18.1) state: STOPPED (CAR_AHEAD) stuck: 331
+Tick 2900: 106 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: STOPPED (CAR_AHEAD) stuck: 1123
+  Car car_1725_bdyhj at (19.4, 19.0) state: STOPPED (CAR_AHEAD) stuck: 370
+  Car car_1773_k9zgm at (40.0, 15.0) state: STOPPED (CAR_AHEAD) stuck: 1020
+  Car car_1830_wiqjc at (26.0, 11.0) state: CRASHED stuck: 1198
+  Car car_1933_zzcj7 at (27.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 307
+Tick 3000: 117 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: CRASHED stuck: 1202
+  Car car_1773_k9zgm at (40.0, 15.0) state: STOPPED (CAR_AHEAD) stuck: 1119
+  Car car_1830_wiqjc at (26.0, 11.0) state: CRASHED stuck: 1198
+  Car car_2237_abilz at (16.9, 19.0) state: STOPPED (CAR_AHEAD) stuck: 337
+  Car car_2252_ci6rg at (17.9, 10.0) state: STOPPED (CAR_AHEAD) stuck: 1179
+Tick 3100: 113 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: CRASHED stuck: 1202
+  Car car_1773_k9zgm at (40.0, 15.0) state: CRASHED stuck: 1168
+  Car car_1786_auxqm at (65.0, 25.0) state: STOPPED (CAR_AHEAD) stuck: 311
+  Car car_2180_35imo at (38.4, 21.0) state: STOPPED (CAR_AHEAD) stuck: 371
+  Car car_2252_ci6rg at (17.9, 10.0) state: CRASHED stuck: 1202
+Tick 3200: 121 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: CRASHED stuck: 1202
+  Car car_1773_k9zgm at (40.0, 15.0) state: CRASHED stuck: 1168
+  Car car_1786_auxqm at (65.0, 25.0) state: STOPPED (CAR_AHEAD) stuck: 410
+  Car car_1984_jymk3 at (31.5, 18.0) state: STOPPED (CAR_AHEAD) stuck: 308
+  Car car_2180_35imo at (38.4, 21.0) state: STOPPED (CAR_AHEAD) stuck: 471
+Tick 3300: 115 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: CRASHED stuck: 1202
+  Car car_1773_k9zgm at (40.0, 15.0) state: CRASHED stuck: 1168
+  Car car_1786_auxqm at (65.0, 25.0) state: STOPPED (CAR_AHEAD) stuck: 510
+  Car car_1984_jymk3 at (31.5, 18.0) state: STOPPED (CAR_AHEAD) stuck: 408
+  Car car_2180_35imo at (38.4, 21.0) state: STOPPED (CAR_AHEAD) stuck: 571
+Tick 3400: 138 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: CRASHED stuck: 1202
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 363
+  Car car_1702_91gvj at (13.0, 18.0) state: STOPPED (CAR_AHEAD) stuck: 356
+  Car car_1725_bdyhj at (18.3, 19.0) state: STOPPED (CAR_AHEAD) stuck: 369
+  Car car_1773_k9zgm at (40.0, 15.0) state: CRASHED stuck: 1168
+Tick 3500: 169 cars stuck.
+  Car car_1235_q8bh6 at (15.4, 8.0) state: CRASHED stuck: 1202
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 463
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 347
+  Car car_1702_91gvj at (13.0, 18.0) state: STOPPED (CAR_AHEAD) stuck: 456
+  Car car_1725_bdyhj at (18.3, 19.0) state: STOPPED (CAR_AHEAD) stuck: 469
+Tick 3600: 179 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 562
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 446
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 434
+  Car car_1773_k9zgm at (40.0, 15.0) state: CRASHED stuck: 1168
+  Car car_1852_j48j1 at (44.0, 10.0) state: STOPPED (CAR_AHEAD) stuck: 329
+Tick 3700: 159 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 662
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 545
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 534
+  Car car_1855_rowbu at (24.5, 19.0) state: STOPPED (CAR_AHEAD) stuck: 661
+  Car car_1984_jymk3 at (31.5, 18.0) state: STOPPED (CAR_AHEAD) stuck: 808
+Tick 3800: 159 cars stuck.
+  Car car_1357_la68l at (39.6, 21.0) state: STOPPED (CAR_AHEAD) stuck: 330
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 761
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 645
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 634
+  Car car_1855_rowbu at (24.5, 19.0) state: STOPPED (CAR_AHEAD) stuck: 761
+Tick 3900: 163 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 861
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 744
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 734
+  Car car_1855_rowbu at (24.5, 19.0) state: STOPPED (CAR_AHEAD) stuck: 861
+  Car car_1984_jymk3 at (31.5, 18.0) state: STOPPED (CAR_AHEAD) stuck: 1008
+Tick 4000: 159 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 960
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 844
+  Car car_1725_bdyhj at (17.6, 19.0) state: STOPPED (CAR_AHEAD) stuck: 302
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 834
+  Car car_1855_rowbu at (24.5, 19.0) state: STOPPED (CAR_AHEAD) stuck: 961
+Tick 4100: 197 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 1060
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 943
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 934
+  Car car_1786_auxqm at (64.0, 24.2) state: STOPPED (CAR_AHEAD) stuck: 342
+  Car car_1855_rowbu at (24.5, 19.0) state: STOPPED (CAR_AHEAD) stuck: 1061
+Tick 4200: 207 cars stuck.
+  Car car_1357_la68l at (39.6, 21.0) state: STOPPED (CAR_AHEAD) stuck: 359
+  Car car_1497_xis20 at (22.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 1159
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 1043
+  Car car_1702_91gvj at (13.0, 22.3) state: STOPPED (CAR_AHEAD) stuck: 302
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 1034
+Tick 4300: 190 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: CRASHED stuck: 1197
+  Car car_1523_s5dxl at (37.0, 20.0) state: STOPPED (CAR_AHEAD) stuck: 1142
+  Car car_1702_91gvj at (13.0, 22.3) state: STOPPED (CAR_AHEAD) stuck: 402
+  Car car_1744_jk1um at (28.3, 20.0) state: STOPPED (CAR_AHEAD) stuck: 1134
+  Car car_1855_rowbu at (24.5, 19.0) state: CRASHED stuck: 1202
+Tick 4400: 189 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: CRASHED stuck: 1197
+  Car car_1523_s5dxl at (37.0, 20.0) state: CRASHED stuck: 1199
+  Car car_1702_91gvj at (13.0, 22.3) state: STOPPED (CAR_AHEAD) stuck: 502
+  Car car_1744_jk1um at (28.3, 20.0) state: CRASHED stuck: 1202
+  Car car_1852_j48j1 at (65.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 305
+Tick 4500: 184 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: CRASHED stuck: 1197
+  Car car_1523_s5dxl at (37.0, 20.0) state: CRASHED stuck: 1199
+  Car car_1702_91gvj at (13.0, 22.3) state: STOPPED (CAR_AHEAD) stuck: 602
+  Car car_1705_tt8pa at (44.0, 19.0) state: STOPPED (CAR_AHEAD) stuck: 302
+  Car car_1744_jk1um at (28.3, 20.0) state: CRASHED stuck: 1202
+Tick 4600: 181 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: CRASHED stuck: 1197
+  Car car_1523_s5dxl at (37.0, 20.0) state: CRASHED stuck: 1199
+  Car car_1702_91gvj at (13.0, 22.3) state: STOPPED (CAR_AHEAD) stuck: 702
+  Car car_1744_jk1um at (28.3, 20.0) state: CRASHED stuck: 1202
+  Car car_1855_rowbu at (24.5, 19.0) state: CRASHED stuck: 1202
+Tick 4700: 179 cars stuck.
+  Car car_1240_25b8e at (15.0, 11.0) state: STOPPED (CAR_AHEAD) stuck: 342
+  Car car_1497_xis20 at (22.0, 19.0) state: CRASHED stuck: 1197
+  Car car_1523_s5dxl at (37.0, 20.0) state: CRASHED stuck: 1199
+  Car car_1702_91gvj at (13.0, 22.3) state: STOPPED (CAR_AHEAD) stuck: 802
+  Car car_1744_jk1um at (28.3, 20.0) state: CRASHED stuck: 1202
+Tick 4800: 162 cars stuck.
+  Car car_1497_xis20 at (22.0, 19.0) state: CRASHED stuck: 1197
+  Car car_1523_s5dxl at (37.0, 20.0) state: CRASHED stuck: 1199
+  Car car_1702_91gvj at (13.0, 22.3) state: CRASHED stuck: 883
+  Car car_1744_jk1um at (28.3, 20.0) state: CRASHED stuck: 1202
+  Car car_1855_rowbu at (24.5, 19.0) state: CRASHED stuck: 1202
+Tick 4900: 151 cars stuck.
+  Car car_1523_s5dxl at (37.0, 20.0) state: CRASHED stuck: 1199
+  Car car_1702_91gvj at (13.0, 22.3) state: CRASHED stuck: 883
+  Car car_1744_jk1um at (28.3, 20.0) state: CRASHED stuck: 1202
+  Car car_1924_cb9ew at (65.0, 27.0) state: STOPPED (CAR_AHEAD) stuck: 1149
+  Car car_2115_4srle at (63.0, 24.8) state: CRASHED stuck: 1201
+Final stats: 443 cars remaining, 289 exited.
+
+ [31m❯[39m traffix/src/reproduce.test.ts [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 92963[2mms[22m[39m
+[31m   [31m×[31m reproduce gridlock[39m[33m 92960[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m traffix/src/reproduce.test.ts[2m > [22mreproduce gridlock
+[31m[1mError[22m: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m traffix/src/reproduce.test.ts:[2m5:1[22m[39m
+    [90m  3| [39m[35mimport[39m { [33mSimulation[39m } [35mfrom[39m [32m'./core/Simulation'[39m[33m;[39m
+    [90m  4| [39m
+    [90m  5| [39m[34mtest[39m([32m'reproduce gridlock'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   | [39m[31m^[39m
+    [90m  6| [39m    console[33m.[39m[34mlog[39m([32m'--- REPRODUCTION ATTEMPT (10x Speed) ---'[39m)[33m;[39m
+    [90m  7| [39m    [35mconst[39m sim [33m=[39m [35mnew[39m [33mSimulation[39m([34m80[39m[33m,[39m [34m40[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 10:41:08
+[2m   Duration [22m 93.62s[2m (transform 269ms, setup 0ms, import 329ms, tests 92.96s, environment 0ms)[22m
+

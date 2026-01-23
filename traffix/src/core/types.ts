@@ -39,5 +39,9 @@ export interface SimulationState {
     gameOver: boolean;
     gameOverReason: string | null;
     rebelDebug: boolean;
+    collisionRecovery: boolean;
     currentSpawnRate: number;
+    spawnStuckWarning: boolean;
+    laneQueues: { [laneId: string]: number }; // Maps "x,y" to count
+    blockedSpawnIds: string[]; 
 }

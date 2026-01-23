@@ -36,6 +36,7 @@ export class UI {
             <div id="spawn-stuck-warning" style="display: none; position: absolute; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(231, 76, 60, 0.9); color: white; padding: 20px 40px; font-size: 2rem; border-radius: 8px; font-weight: bold; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 2000;">
                 ⚠️ SPAWN BLOCKED! ⚠️
                 <div style="font-size: 1rem; margin-top: 10px;">Clear traffic or Game Over!</div>
+                <div id="countdown-timer" style="font-size: 3rem; margin-top: 10px; color: #f1c40f;">10</div>
             </div>
 
             <div class="stats-panel">
@@ -429,8 +430,9 @@ export class UI {
     public update(state: SimulationState) {
         if (state.gameOver) { this.showGameOver(state.gameOverReason || "Game Over", state.score); return; }
         const warningEl = document.getElementById('spawn-stuck-warning');
+        const countdownEl = document.getElementById('countdown-timer');
         if (warningEl) {
-            const isWarning = (state as any).spawnStuckWarning;
+            const isWarning = state.spawnStuckWarning;
             warningEl.style.display = isWarning ? 'block' : 'none';
             if (isWarning) {
                 const speedSlider = document.getElementById('sim-speed') as HTMLInputElement;
@@ -438,9 +440,16 @@ export class UI {
                     speedSlider.value = "1.0";
                     document.getElementById('speed-val')!.innerText = "1.0x";
                 }
+
+                // Calculate countdown: 1200 ticks is game over. Warning starts at 600.
+                const maxStuck = Math.max(0, ...state.vehicles.map(v => v.spawnStuckTimer || 0));
+                const remaining = Math.ceil((1200 - maxStuck) / 60);
+                if (countdownEl) {
+                    countdownEl.innerText = remaining > 0 ? remaining.toString() : "!";
+                }
             }
         }
-        this.updateScore(state.score, state.exitedCars, (state as any).currentSpawnRate);
+        this.updateScore(state.score, state.exitedCars, state.currentSpawnRate);
         const selInfo = document.getElementById('selection-info');
         if (selInfo) {
             const selId = this.simulation.selectedVehicleId;

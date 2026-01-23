@@ -101,6 +101,7 @@ export class Renderer {
         this.entityGraphics.clear();
         this.labelContainer.removeChildren();
 
+        // Traffic Lights
         state.trafficLights.forEach(light => {
             this.entityGraphics.beginPath()
                 .roundRect(light.position.x * this.cellSize + 4, light.position.y * this.cellSize + 2, this.cellSize - 8, this.cellSize - 4, 4)
@@ -113,28 +114,51 @@ export class Renderer {
             
             this.entityGraphics.beginPath()
                 .circle(light.position.x * this.cellSize + this.cellSize / 2, light.position.y * this.cellSize + this.cellSize / 2, this.cellSize / 4)
-                .fill(color)
-                .stroke({ color: color, width: 2, alpha: 0.3 });
+                .fill(color);
         });
 
+        // Blocked Spawns (Flashing Red) & Per-lane Queues
+        const flash = (Math.floor(Date.now() / 250) % 2) === 0;
+        state.grid.forEach((row, y) => row.forEach((cell, x) => {
+            if (cell.type === 'entry') {
+                const key = `${x},${y}`;
+                const queue = state.laneQueues[key] || 0;
+                
+                // Red flash if blocked
+                if (state.blockedSpawnIds.includes(key) && flash) {
+                    this.entityGraphics.beginPath()
+                        .rect(x * this.cellSize, y * this.cellSize, this.cellSize, this.cellSize)
+                        .fill({ color: 0xe74c3c, alpha: 0.5 });
+                }
+
+                // Show per-lane queue number
+                if (queue > 0) {
+                    const text = new PIXI.Text({
+                        text: queue.toString(),
+                        style: { fontFamily: 'monospace', fontSize: 12, fill: 0xffffff, fontWeight: 'bold' }
+                    });
+                    text.anchor.set(0.5);
+                    text.position.set(x * this.cellSize + this.cellSize/2, y * this.cellSize + this.cellSize/2);
+                    this.labelContainer.addChild(text);
+                }
+            }
+        }));
+
+        // Vehicles
         state.vehicles.forEach(vehicle => {
-            if (!(vehicle instanceof Car)) return;
             const car = vehicle as Car;
             const isSelected = car.id === (state as any).selectedVehicleId;
             let color = 0xf1c40f;
             
             if (car.isCollided) color = 0x8e44ad;
-            else if (car.spawnStuckTimer > 60) color = (Math.floor(Date.now() / 200) % 2) === 0 ? 0xe74c3c : 0xf1c40f;
-            else if (car.stuckTimer > 1200) color = 0xe67e22;
             else if (isSelected) color = 0x3498db;
-            else if (state.rebelDebug && car.violatesRules) color = 0xff00ff;
+            else if (state.rebelDebug && car.violatesRules) color = 0xff00ff; // MAGENTA
 
             this.entityGraphics.beginPath()
                 .rect(vehicle.position.x * this.cellSize + 4, vehicle.position.y * this.cellSize + 4, this.cellSize - 8, this.cellSize - 8)
                 .fill(color);
 
-            // Labels & Countdowns
-            let timerSeconds: number | null = null;
+            // Crash Countdown
             if (car.isCollided) {
                 this.entityGraphics.beginPath()
                     .moveTo(vehicle.position.x * this.cellSize + 4, vehicle.position.y * this.cellSize + 4)
@@ -143,38 +167,15 @@ export class Renderer {
                     .lineTo(vehicle.position.x * this.cellSize + 4, vehicle.position.y * this.cellSize + 16)
                     .stroke({ width: 2, color: 0xffffff });
                 
-                // Crashed car countdown (clears after 600 ticks)
-                timerSeconds = Math.ceil((600 - car.collisionTimer) / 60);
-            } else if (car.spawnStuckTimer > 60) {
-                // Stuck at spawn countdown (ends game after 1200 ticks)
-                timerSeconds = Math.ceil((1200 - car.spawnStuckTimer) / 60);
-            }
-
-            if (timerSeconds !== null && timerSeconds >= 0) {
-                const text = new PIXI.Text({
-                    text: timerSeconds.toString(),
-                    style: {
-                        fontFamily: 'monospace',
-                        fontSize: 14,
-                        fill: 0xffffff,
-                        stroke: { color: 0x000000, width: 2 }
-                    }
-                });
-                text.anchor.set(0.5);
-                text.position.set(vehicle.position.x * this.cellSize + this.cellSize / 2, vehicle.position.y * this.cellSize - 10);
-                this.labelContainer.addChild(text);
-            }
-
-            if (isSelected && this.debugMode) {
-                const points = (vehicle as Car).path.slice(vehicle.currentTargetIndex).map(p => ({ x: p.x * this.cellSize + this.cellSize / 2, y: p.y * this.cellSize + this.cellSize / 2 }));
-                if (points.length > 1) {
-                    this.entityGraphics.beginPath()
-                        .poly(points, false)
-                        .stroke({ color: 0xffffff, width: 3, alpha: 0.9 });
-                    
-                    this.entityGraphics.beginPath()
-                        .circle(points[0].x, points[0].y, 4)
-                        .fill(0xff0000);
+                const timerSeconds = Math.ceil((600 - car.collisionTimer) / 60);
+                if (timerSeconds >= 0) {
+                    const text = new PIXI.Text({
+                        text: timerSeconds.toString(),
+                        style: { fontFamily: 'monospace', fontSize: 14, fill: 0xffffff, stroke: { color: 0x000000, width: 2 } }
+                    });
+                    text.anchor.set(0.5);
+                    text.position.set(vehicle.position.x * this.cellSize + this.cellSize / 2, vehicle.position.y * this.cellSize - 10);
+                    this.labelContainer.addChild(text);
                 }
             }
         });

@@ -15,42 +15,58 @@ export class Intersection implements IntersectionState {
     }
 
     private setDefaultPhases() {
-        // Standard Round Robin default
+        // Individual Direction Round Robin (Maximize safety, minimize lane-changing panic)
         this.phases = [
+            // North
             {
-                id: 'p1',
-                name: 'NS Green',
-                duration: 300,
-                lightStates: { 'n': 'GREEN', 's': 'GREEN', 'e': 'RED', 'w': 'RED' }
+                id: 'p1', name: 'N Green', duration: 150,
+                lightStates: { 'n': 'GREEN', 's': 'RED', 'e': 'RED', 'w': 'RED' }
             },
             {
-                id: 'p2',
-                name: 'NS Yellow',
-                duration: 60,
-                lightStates: { 'n': 'YELLOW', 's': 'YELLOW', 'e': 'RED', 'w': 'RED' }
+                id: 'p2', name: 'N Yellow', duration: 30,
+                lightStates: { 'n': 'YELLOW', 's': 'RED', 'e': 'RED', 'w': 'RED' }
             },
             {
-                id: 'p3',
-                name: 'All Red',
-                duration: 60,
+                id: 'p3', name: 'All Red', duration: 30,
                 lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'RED' }
             },
+            // South
             {
-                id: 'p4',
-                name: 'EW Green',
-                duration: 300,
-                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'GREEN', 'w': 'GREEN' }
+                id: 'p4', name: 'S Green', duration: 150,
+                lightStates: { 'n': 'RED', 's': 'GREEN', 'e': 'RED', 'w': 'RED' }
             },
             {
-                id: 'p5',
-                name: 'EW Yellow',
-                duration: 60,
-                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'YELLOW', 'w': 'YELLOW' }
+                id: 'p5', name: 'S Yellow', duration: 30,
+                lightStates: { 'n': 'RED', 's': 'YELLOW', 'e': 'RED', 'w': 'RED' }
             },
-             {
-                id: 'p6',
-                name: 'All Red',
-                duration: 60,
+            {
+                id: 'p6', name: 'All Red', duration: 30,
+                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'RED' }
+            },
+            // East
+            {
+                id: 'p7', name: 'E Green', duration: 150,
+                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'GREEN', 'w': 'RED' }
+            },
+            {
+                id: 'p8', name: 'E Yellow', duration: 30,
+                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'YELLOW', 'w': 'RED' }
+            },
+            {
+                id: 'p9', name: 'All Red', duration: 30,
+                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'RED' }
+            },
+            // West
+            {
+                id: 'p10', name: 'W Green', duration: 150,
+                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'GREEN' }
+            },
+            {
+                id: 'p11', name: 'W Yellow', duration: 30,
+                lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'YELLOW' }
+            },
+            {
+                id: 'p12', name: 'All Red', duration: 30,
                 lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'RED' }
             }
         ];
@@ -58,22 +74,16 @@ export class Intersection implements IntersectionState {
 
     public update() {
         if (!this.phases || this.phases.length === 0) return;
-
         this.timer++;
-        
-        // Safety check for index out of bounds
         if (this.currentPhaseIndex >= this.phases.length) {
             this.currentPhaseIndex = 0;
             this.timer = 0;
         }
-
         const currentPhase = this.phases[this.currentPhaseIndex];
-
         if (this.timer >= currentPhase.duration) {
             this.timer = 0;
             this.currentPhaseIndex = (this.currentPhaseIndex + 1) % this.phases.length;
         }
-
         this.applyPhase();
     }
 
@@ -82,15 +92,11 @@ export class Intersection implements IntersectionState {
         const currentPhase = this.phases[this.currentPhaseIndex];
         this.lights.forEach(light => {
             const parts = light.id.split('_');
-            const dirPart = parts[1]; // "n1", "s2", etc.
-            const dir = dirPart.charAt(0); // "n", "s", "e", "w"
-            
+            const dirPart = parts[1]; 
+            const dir = dirPart.charAt(0); 
             const state = currentPhase.lightStates[dir];
-            if (state) {
-                light.state = state;
-            } else {
-                light.state = 'RED';
-            }
+            if (state) light.state = state;
+            else light.state = 'RED';
         });
     }
 }
