@@ -33,10 +33,10 @@ export class UI {
                 <h3 style="margin: 0; color: #3498db;">Traffix Controls</h3>
             </div>
             
-            <div id="spawn-stuck-warning" style="display: none; position: absolute; top: 100px; left: 50%; transform: translateX(-50%); background: rgba(231, 76, 60, 0.9); color: white; padding: 20px 40px; font-size: 2rem; border-radius: 8px; font-weight: bold; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 2000;">
+            <div id="spawn-stuck-warning" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(231, 76, 60, 0.95); color: white; padding: 15px 30px; font-size: 1.5rem; border-radius: 8px; font-weight: bold; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 9999;">
                 ⚠️ SPAWN BLOCKED! ⚠️
-                <div style="font-size: 1rem; margin-top: 10px;">Clear traffic or Game Over!</div>
-                <div id="countdown-timer" style="font-size: 3rem; margin-top: 10px; color: #f1c40f;">10</div>
+                <div style="font-size: 0.9rem; margin-top: 5px;">Clear traffic or Game Over!</div>
+                <div id="countdown-timer" style="font-size: 2.5rem; margin-top: 8px; color: #f1c40f;">10</div>
             </div>
 
             <div class="stats-panel">

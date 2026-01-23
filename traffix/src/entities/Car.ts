@@ -72,9 +72,9 @@ export class Car {
         const light = this.getNearestLightInCorridor(lights, ux, uy, grid);
         if (light && light.state !== 'GREEN') {
             const dToL = Math.sqrt((light.position.x - this.position.x)**2 + (light.position.y - this.position.y)**2);
-            limitDist = dToL - 0.75; 
+            limitDist = dToL - 1.0; // Stop 1.0 unit before light to avoid peeking past
             this.limitReason = 'RED_LIGHT';
-            if (limitDist < 0.15) isHardBlockedNow = true;
+            if (limitDist < 0.1) isHardBlockedNow = true;
         }
 
         // 2. Lead Vehicle Detection (Target Gap: 1.2 center-to-center = 0.6 visual gap)
@@ -156,19 +156,52 @@ export class Car {
                 if (other.id === this.id) continue;
                 const dxO = other.position.x - nextX, dyO = other.position.y - nextY;
                 const dSq = dxO*dxO + dyO*dyO;
-                // 1.44 = 1.2^2 for minimum 0.6-unit gap (car length is ~0.6)
+                const crossLateral = Math.abs(dxO * uy - dyO * ux);
+                
+                // Same-lane following distance (1.44 = 1.2^2 for minimum 0.6-unit gap)
                 if (dSq < 1.44) { 
                     const dot = dxO * ux + dyO * uy;
-                    const cross = Math.abs(dxO * uy - dyO * ux);
                     // Only restrict if car is AHEAD (dot > 0) and in same lane (cross < 0.5)
-                    if (dot > 0 && cross < 0.5) {
+                    if (dot > 0 && crossLateral < 0.5) {
                         restricted = true;
-                        // Collision only if overlap is severe (< 0.81 = 0.9^2)
-                        if (this.velocity > 0.15 && dSq < 0.81 && other.lifeTicks > 40) {
+                        // Collision only if:
+                        // - Overlap is severe (< 0.64 = 0.8^2)
+                        // - This car is moving fast enough to cause real impact (> 0.25)
+                        // - Other car has existed long enough (not just spawned)
+                        // - Both cars are in motion OR severe overlap (< 0.49 = 0.7^2)
+                        const isHighSpeedImpact = this.velocity > 0.25 && dSq < 0.64;
+                        const isSevereOverlap = dSq < 0.49; // Cars physically overlapping
+                        if ((isHighSpeedImpact || isSevereOverlap) && other.lifeTicks > 40) {
                             this.isCollided = true;
                             other.isCollided = true;
                         }
                         break;
+                    }
+                }
+                
+                // Cross-traffic collision - only for cars going in truly DIFFERENT directions
+                // Skip if we're in the same lane (already handled above)
+                if (dSq < 0.36 && crossLateral > 0.3 && other.lifeTicks > 20 && this.velocity > 0.1) { // 0.6^2 = actual overlap
+                    // Get other car's heading
+                    const otherTarget = other.path[other.currentTargetIndex];
+                    if (otherTarget) {
+                        const odx = otherTarget.x - other.position.x;
+                        const ody = otherTarget.y - other.position.y;
+                        const oLen = Math.sqrt(odx*odx + ody*ody);
+                        if (oLen > 0.01) {
+                            const oux = odx / oLen, ouy = ody / oLen;
+                            // Dot product of headings: 1 = same dir, -1 = opposite, 0 = perpendicular
+                            const headingDot = ux * oux + uy * ouy;
+                            // Only collide if going truly different directions (< 0.5 = more than 60 degrees apart)
+                            // Also require they're moving toward each other, not just passing by
+                            const approachDot = -(dxO * ux + dyO * uy); // Positive if we're moving toward them
+                            if (headingDot < 0.5 && approachDot > 0) {
+                                this.isCollided = true;
+                                other.isCollided = true;
+                                restricted = true;
+                                break;
+                            }
+                        }
                     }
                 }
             }

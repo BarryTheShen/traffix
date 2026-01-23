@@ -167,7 +167,8 @@ export class Renderer {
                     .lineTo(vehicle.position.x * this.cellSize + 4, vehicle.position.y * this.cellSize + 16)
                     .stroke({ width: 2, color: 0xffffff });
                 
-                const timerSeconds = Math.ceil((600 - car.collisionTimer) / 60);
+                // Use 300 ticks (5 seconds at 60fps) to match collisionCleanupTimeout
+                const timerSeconds = Math.ceil((300 - car.collisionTimer) / 60);
                 if (timerSeconds >= 0) {
                     const text = new PIXI.Text({
                         text: timerSeconds.toString(),

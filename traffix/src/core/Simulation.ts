@@ -17,10 +17,10 @@ export class Simulation {
     private lightController: TrafficLightController;
 
     // Game Balance Config
-    public stuckCleanupTimeout: number = 900; // Clean up stuck cars before they cause game over 
-    public collisionCleanupTimeout: number = 600; 
-    public gameOverTimeout: number = 1200; 
-    public crashPenalty: number = 100;
+    public stuckCleanupTimeout: number = 2700; // Triple the time before stuck cars are removed
+    public collisionCleanupTimeout: number = 300; // Remove crashed cars faster (5 seconds) 
+    public gameOverTimeout: number = 3000; // Game over after 50 seconds of blocked spawn (after stuck cleanup)
+    public crashPenalty: number = 1000;
     public currentLevel: string = 'level1';
     public baseSpawnRate: number = 1.0;
     public spawnRate: number = 1.0;
@@ -255,6 +255,7 @@ export class Simulation {
             if (!wasCollided && car.isCollided) {
                 this.totalCrashes++;
                 this.countedCrashIds.add(car.id);
+                this.state.score -= this.crashPenalty; // Apply crash penalty to score
             }
             if (car.spawnStuckTimer > 600) isAnySpawnStuck = true;
             if (car.spawnStuckTimer > this.gameOverTimeout) {
