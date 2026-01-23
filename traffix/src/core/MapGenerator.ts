@@ -17,6 +17,7 @@ export class MapGenerator {
         const width = grid[0].length;
         const s = start !== undefined ? Math.max(0, start) : 0;
         const e = end !== undefined ? Math.min(axis === 'y' ? height : width, end) : (axis === 'y' ? height : width);
+        const roadId = `road_${axis}_${pos}`;
 
         if (axis === 'y') {
             for (let y = s; y < e; y++) {
@@ -24,6 +25,7 @@ export class MapGenerator {
                     const lx = pos - lanes + l;
                     if (lx >= 0 && lx < width) {
                         grid[y][lx].type = 'road';
+                        grid[y][lx].roadId = roadId;
                         const dir: Direction = (l < lanes) ? 'SOUTH' : 'NORTH';
                         if (!grid[y][lx].allowedDirections.includes(dir)) {
                             grid[y][lx].allowedDirections.push(dir);
@@ -38,6 +40,7 @@ export class MapGenerator {
                     const ly = pos - lanes + l;
                     if (ly >= 0 && ly < height) {
                         grid[ly][x].type = 'road';
+                        grid[ly][x].roadId = roadId;
                         const dir: Direction = (l < lanes) ? 'WEST' : 'EAST';
                         if (!grid[ly][x].allowedDirections.includes(dir)) {
                             grid[ly][x].allowedDirections.push(dir);
@@ -70,10 +73,6 @@ export class MapGenerator {
             for (let x = 0; x < width; x++) {
                 const cell = grid[y][x];
                 if (cell.type === 'empty') continue;
-
-                if (cell.type !== 'intersection') {
-                    cell.type = 'road';
-                }
 
                 const isEdge = x === 0 || x === width - 1 || y === 0 || y === height - 1;
                 if (!isEdge) continue;
@@ -147,8 +146,6 @@ export class MapGenerator {
 
     private static generateRandomLevel(width: number, height: number): { grid: GridCell[][], intersections: { x: number, y: number }[] } {
         const grid = this.createEmptyGrid(width, height);
-        
-        // Larger gaps (min 15 units between roads)
         const xAnchors = [15, 40, 65];
         const yAnchors = [10, 20, 30];
         
@@ -188,18 +185,16 @@ export class MapGenerator {
         const nodes = new Set<string>();
         activeEdges.forEach(e => { nodes.add(`${e.n1.x},${e.n1.y}`); nodes.add(`${e.n2.x},${e.n2.y}`); });
 
-        // Identify which nodes are connected to entrances
         const entranceConnections = new Map<string, number>();
         nodes.forEach(s => {
             const [x, y] = s.split(',').map(Number);
             let count = 0;
             if (x === 15 || x === 65 || y === 10 || y === 30) {
-                count = 1; // Each of these is an anchor on the boundary of the internal network
+                count = 1; 
             }
             entranceConnections.set(s, count);
         });
 
-        // Add internal roads with extra length for intersection overlap
         activeEdges.forEach(e => {
             if (e.n1.x === e.n2.x) {
                 this.addRoad(grid, 'y', e.n1.x, 2, Math.min(e.n1.y, e.n2.y) - 5, Math.max(e.n1.y, e.n2.y) + 5);
@@ -208,7 +203,6 @@ export class MapGenerator {
             }
         });
 
-        // Add entrance segments that overlap with internal nodes
         nodes.forEach(s => {
             const [x, y] = s.split(',').map(Number);
             if (x === 15) this.addRoad(grid, 'x', y, 2, 0, 15 + 5);

@@ -60,81 +60,34 @@ export class Pathfinding {
 
                 if (targetCell.type !== 'empty') {
                     let canMove = true;
-                    // Determine Heading
                     const moveDir: Direction =
                         dir.dx === 1 ? 'EAST' :
                             dir.dx === -1 ? 'WEST' :
                                 dir.dy === 1 ? 'SOUTH' : 'NORTH';
 
-                    // 1. Basic Connectivity
                     const roadTypes = ['road', 'entry', 'exit'];
-                    if (roadTypes.includes(currentCell.type)) {
-                        // Allow movement in primary direction
+                    
+                    if (roadTypes.includes(currentCell.type) && roadTypes.includes(targetCell.type)) {
                         if (currentCell.allowedDirections.includes(moveDir)) {
                             canMove = true;
-                        } 
-                        // ALSO allow lane switching (perpendicular to primary direction)
-                        else if (!ignoreLaneRules) {
-                            const primaryDir = currentCell.allowedDirections[0];
-                            const isPerpendicular = 
-                                ((primaryDir === 'NORTH' || primaryDir === 'SOUTH') && (moveDir === 'EAST' || moveDir === 'WEST')) ||
-                                ((primaryDir === 'EAST' || primaryDir === 'WEST') && (moveDir === 'NORTH' || moveDir === 'SOUTH'));
-                            
-                            if (isPerpendicular) {
-                                // Only allow switching to another road cell of the same primary direction
-                                if (targetCell.type === 'road' && targetCell.allowedDirections.includes(primaryDir)) {
-                                    canMove = true;
-                                } else {
-                                    canMove = false;
-                                }
-                            } else {
-                                canMove = false;
-                            }
                         } else {
-                            canMove = false;
-                        }
-                    }
-                    if (canMove && roadTypes.includes(targetCell.type)) {
-                        if (!targetCell.allowedDirections.includes(moveDir)) {
-                            // Similar logic for target cell
-                             const targetPrimary = targetCell.allowedDirections[0];
-                             const isPerp = 
-                                ((targetPrimary === 'NORTH' || targetPrimary === 'SOUTH') && (moveDir === 'EAST' || moveDir === 'WEST')) ||
-                                ((targetPrimary === 'EAST' || targetPrimary === 'WEST') && (moveDir === 'NORTH' || moveDir === 'SOUTH'));
-                             if (!isPerp && !ignoreLaneRules) canMove = false;
+                            canMove = ignoreLaneRules;
                         }
                     }
 
-                    // 2. Lane Discipline
                     if (canMove && !ignoreLaneRules && currentCell.type === 'intersection' && roadTypes.includes(targetCell.type)) {
                         const exitDir = targetCell.allowedDirections[0];
-
-                        // Walk back through parent chain to find the road we entered from
                         const entryInfo = this.findIntersectionEntry(node, grid);
 
                         if (entryInfo) {
                             const turn = this.getTurnType(entryInfo.direction, exitDir);
-
                             if (entryInfo.laneType === 'OUTER') {
-                                // Right lane: STRAIGHT or RIGHT only
-                                if (turn === 'LEFT') {
-                                    canMove = false;
-                                }
+                                if (turn === 'LEFT') canMove = false;
                             } else if (entryInfo.laneType === 'INNER') {
-                                // Left lane: STRAIGHT or LEFT only
-                                if (turn === 'RIGHT') {
-                                    canMove = false;
-                                }
+                                if (turn === 'RIGHT') canMove = false;
                             }
                         }
                     }
-
-                    /* 
-                       Removed Rule 3: NO ZIG-ZAG IN INTERSECTION
-                       This rule was too restrictive for 4x4 intersections, 
-                       preventing cars from ever making turns.
-                       Lane discipline (Rule 2) already handles valid turn lanes.
-                    */
 
                     if (canMove) {
                         neighbors.push({ x: nx, y: ny });
@@ -145,40 +98,24 @@ export class Pathfinding {
         return neighbors;
     }
 
-    // Helper: Walk back through parent chain to find where we entered the intersection from
     private static findIntersectionEntry(node: Node, grid: GridCell[][]): { direction: Direction; laneType: 'INNER' | 'OUTER' } | null {
         let current: Node | undefined = node;
-
-        // Walk back through the path
         while (current && current.parent) {
             const parentCell = grid[current.parent.y]?.[current.parent.x];
             const currentCell = grid[current.y]?.[current.x];
-
-            // Found it: parent is a road, current is intersection
             if (parentCell && currentCell &&
                 (parentCell.type === 'road' || parentCell.type === 'entry') &&
                 currentCell.type === 'intersection') {
-
                 const direction = parentCell.allowedDirections[0];
                 const laneType = parentCell.laneType;
-
-                if (direction && laneType) {
-                    return { direction, laneType };
-                }
+                if (direction && laneType) return { direction, laneType };
             }
-
             current = current.parent;
         }
-
         return null;
     }
 
     private static getTurnType(from: Direction, to: Direction): 'STRAIGHT' | 'LEFT' | 'RIGHT' | 'UTURN' {
-        // Turn types are from the DRIVER's perspective in SCREEN coordinates (Y increases downward)
-        // When driving NORTH (up on screen): LEFT = WEST, RIGHT = EAST
-        // When driving SOUTH (down on screen): LEFT = EAST, RIGHT = WEST  
-        // When driving EAST (right on screen): LEFT = NORTH, RIGHT = SOUTH  
-        // When driving WEST (left on screen): LEFT = SOUTH, RIGHT = NORTH
         if (from === to) return 'STRAIGHT';
         if (from === 'NORTH') return to === 'WEST' ? 'LEFT' : to === 'EAST' ? 'RIGHT' : 'UTURN';
         if (from === 'SOUTH') return to === 'EAST' ? 'LEFT' : to === 'WEST' ? 'RIGHT' : 'UTURN';
@@ -186,8 +123,6 @@ export class Pathfinding {
         if (from === 'WEST') return to === 'SOUTH' ? 'LEFT' : to === 'NORTH' ? 'RIGHT' : 'UTURN';
         return 'STRAIGHT';
     }
-
-
 
     private static reconstructPath(node: Node): Vector2D[] {
         const path: Vector2D[] = [];
@@ -207,25 +142,7 @@ class Node {
     public h: number;
     public f: number;
     public parent?: Node;
-    public entryDirection?: Direction;
-    public entryLaneType?: 'INNER' | 'OUTER';
-
-    constructor(
-        x: number,
-        y: number,
-        g: number,
-        h: number,
-        parent?: Node,
-        entryDirection?: Direction,
-        entryLaneType?: 'INNER' | 'OUTER'
-    ) {
-        this.x = x;
-        this.y = y;
-        this.g = g;
-        this.h = h;
-        this.f = g + h;
-        this.parent = parent;
-        this.entryDirection = entryDirection;
-        this.entryLaneType = entryLaneType;
+    constructor(x: number, y: number, g: number, h: number, parent?: Node) {
+        this.x = x; this.y = y; this.g = g; this.h = h; this.f = g + h; this.parent = parent;
     }
 }

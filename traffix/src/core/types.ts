@@ -9,15 +9,16 @@ export interface Vector2D {
 
 export interface GridCell {
     type: CellType;
-    allowedDirections: Direction[]; // Allowed directions to move from this cell
+    allowedDirections: Direction[]; 
     laneType?: 'INNER' | 'OUTER';
+    roadId?: string; // Unified road identifier
 }
 
 export interface TrafficPhase {
     id: string;
     name: string;
-    duration: number; // Ticks
-    lightStates: { [groupId: string]: 'RED' | 'YELLOW' | 'GREEN' }; // Group ID (e.g., 'north', 'south') to state
+    duration: number; 
+    lightStates: { [groupId: string]: 'RED' | 'YELLOW' | 'GREEN' }; 
 }
 
 export interface IntersectionState {
@@ -25,7 +26,7 @@ export interface IntersectionState {
     phases: TrafficPhase[];
     currentPhaseIndex: number;
     timer: number;
-    lights: any[]; // TrafficLight instances
+    lights: any[]; 
 }
 
 export interface SimulationState {
@@ -42,6 +43,6 @@ export interface SimulationState {
     collisionRecovery: boolean;
     currentSpawnRate: number;
     spawnStuckWarning: boolean;
-    laneQueues: { [laneId: string]: number }; // Maps "x,y" to count
+    laneQueues: { [laneId: string]: number }; 
     blockedSpawnIds: string[]; 
 }
