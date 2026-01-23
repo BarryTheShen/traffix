@@ -17,7 +17,7 @@ export class Simulation {
     private lightController: TrafficLightController;
 
     // Game Balance Config
-    public stuckCleanupTimeout: number = 1800; 
+    public stuckCleanupTimeout: number = 900; // Clean up stuck cars before they cause game over 
     public collisionCleanupTimeout: number = 600; 
     public gameOverTimeout: number = 1200; 
     public crashPenalty: number = 100;
@@ -149,7 +149,14 @@ export class Simulation {
             this.state.tick++;
             // GROWTH RATE FIX: 0.02 car/s^2 -> tick / 3000
             const growth = (this.state.tick / 3000);
-            const targetRate = (this.baseSpawnRate * this.spawnRate) + growth;
+            const baseTargetRate = (this.baseSpawnRate * this.spawnRate) + growth;
+            
+            // Adaptive spawn rate: reduce when queues are building up
+            const totalQueued = Object.values(this.internalLaneQueues).reduce((a, b) => a + b, 0);
+            const blockedFraction = this.blockedSpawnIds.size > 0 ? this.blockedSpawnIds.size / Math.max(1, Object.keys(this.internalLaneQueues).length) : 0;
+            const queuePenalty = Math.min(1.0, totalQueued * 0.1 + blockedFraction * 0.5);
+            const targetRate = Math.max(0.1, baseTargetRate * (1.0 - queuePenalty));
+            
             (this.state as any).currentSpawnRate = Math.min(targetRate, 50.0);
             
             if (this.spawnEnabled) {
@@ -164,15 +171,16 @@ export class Simulation {
             this.lightController.update();
             this.updateVehicles(finalScale);
             
-            // Map internal roadId queues back to grid cells for UI
+            // Map internal queue keys back to grid cells for UI
             this.state.laneQueues = {};
             const blockedIds: string[] = [];
             this.state.grid.forEach((row, y) => row.forEach((cell, x) => {
-                if (cell.type === 'entry' && cell.roadId) {
-                    const key = `${x},${y}`;
-                    const count = this.internalLaneQueues[cell.roadId] || 0;
-                    if (count > 0) this.state.laneQueues[key] = count;
-                    if (this.blockedSpawnIds.has(cell.roadId)) blockedIds.push(key);
+                if (cell.type === 'entry') {
+                    const cellKey = cell.roadId || `entry_${x}_${y}`;
+                    const coordKey = `${x},${y}`;
+                    const count = this.internalLaneQueues[cellKey] || 0;
+                    if (count > 0) this.state.laneQueues[coordKey] = count;
+                    if (this.blockedSpawnIds.has(cellKey)) blockedIds.push(coordKey);
                 }
             }));
             this.state.blockedSpawnIds = blockedIds;
@@ -186,45 +194,51 @@ export class Simulation {
     }
 
     private enqueueSpawn() {
-        const entries: { x: number, y: number, roadId: string }[] = [];
+        const entries: { x: number, y: number, key: string }[] = [];
         this.state.grid.forEach((row, y) => {
             row.forEach((cell, x) => { 
-                if (cell.type === 'entry' && cell.roadId) {
-                    entries.push({ x, y, roadId: cell.roadId });
+                if (cell.type === 'entry') {
+                    // Use roadId if available, otherwise use coordinate-based key
+                    const key = cell.roadId || `entry_${x}_${y}`;
+                    entries.push({ x, y, key });
                 }
             });
         });
         if (entries.length === 0) return;
         
-        const uniqueRoadIds = Array.from(new Set(entries.map(e => e.roadId)));
-        const targetRoadId = uniqueRoadIds[Math.floor(Math.random() * uniqueRoadIds.length)];
-        this.internalLaneQueues[targetRoadId] = (this.internalLaneQueues[targetRoadId] || 0) + 1;
+        // Get unique queue keys and pick one randomly
+        const uniqueKeys = Array.from(new Set(entries.map(e => e.key)));
+        const targetKey = uniqueKeys[Math.floor(Math.random() * uniqueKeys.length)];
+        this.internalLaneQueues[targetKey] = (this.internalLaneQueues[targetKey] || 0) + 1;
     }
 
     private processLaneQueues() {
         this.blockedSpawnIds.clear();
-        for (const roadId in this.internalLaneQueues) {
-            const count = this.internalLaneQueues[roadId];
+        for (const queueKey in this.internalLaneQueues) {
+            const count = this.internalLaneQueues[queueKey];
             if (count <= 0) continue;
             
             const laneCells: {x: number, y: number}[] = [];
             this.state.grid.forEach((row, y) => {
                 row.forEach((cell, x) => {
-                    if (cell.type === 'entry' && cell.roadId === roadId) laneCells.push({x, y});
+                    if (cell.type === 'entry') {
+                        const cellKey = cell.roadId || `entry_${x}_${y}`;
+                        if (cellKey === queueKey) laneCells.push({x, y});
+                    }
                 });
             });
 
             let spawned = false;
             for (const cell of laneCells) {
                 if (this.trySpawnAt(cell.x, cell.y)) {
-                    this.internalLaneQueues[roadId] = count - 1;
+                    this.internalLaneQueues[queueKey] = count - 1;
                     spawned = true;
                     break;
                 }
             }
 
             if (!spawned) {
-                this.blockedSpawnIds.add(roadId);
+                this.blockedSpawnIds.add(queueKey);
             }
         }
     }

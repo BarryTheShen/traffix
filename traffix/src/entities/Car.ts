@@ -77,16 +77,16 @@ export class Car {
             if (limitDist < 0.15) isHardBlockedNow = true;
         }
 
-        // 2. Lead Vehicle Detection (Target Gap: 1.1)
+        // 2. Lead Vehicle Detection (Target Gap: 1.2 center-to-center = 0.6 visual gap)
         const leadInfo = this.getLeadVehicleVector(otherCars, ux, uy);
         if (leadInfo) {
-            const carStopDist = leadInfo.dist - 1.1; 
+            const carStopDist = leadInfo.dist - 1.2; 
             if (carStopDist < limitDist) {
                 limitDist = carStopDist;
                 this.limitReason = 'CAR_AHEAD';
                 obstacleVel = leadInfo.velocity;
                 const other = otherCars.find(c => c.id === leadInfo.id);
-                if (other && leadInfo.dist < 1.5) {
+                if (other && leadInfo.dist < 1.6) {
                     if (other.isWaiting || other.debugState === 'REACTING' || other.velocity < 0.01) {
                         if (carStopDist < 0.15 || this.velocity < 0.01) isHardBlockedNow = true;
                     }
@@ -146,7 +146,7 @@ export class Car {
 
         if (this.velocity < 0.001) this.velocity = 0;
 
-        // 5. Atomic Physical Lock
+        // 5. Atomic Physical Lock - Enforces minimum 0.6-unit gap (1.2 center-to-center)
         const moveDist = Math.min(this.velocity, distToT);
         if (moveDist > 0) {
             const nextX = this.position.x + ux * moveDist;
@@ -156,11 +156,14 @@ export class Car {
                 if (other.id === this.id) continue;
                 const dxO = other.position.x - nextX, dyO = other.position.y - nextY;
                 const dSq = dxO*dxO + dyO*dyO;
-                if (dSq < 1.05) { 
+                // 1.44 = 1.2^2 for minimum 0.6-unit gap (car length is ~0.6)
+                if (dSq < 1.44) { 
                     const dot = dxO * ux + dyO * uy;
                     const cross = Math.abs(dxO * uy - dyO * ux);
-                    if (dot > 0 && cross < 0.45) {
+                    // Only restrict if car is AHEAD (dot > 0) and in same lane (cross < 0.5)
+                    if (dot > 0 && cross < 0.5) {
                         restricted = true;
+                        // Collision only if overlap is severe (< 0.81 = 0.9^2)
                         if (this.velocity > 0.15 && dSq < 0.81 && other.lifeTicks > 40) {
                             this.isCollided = true;
                             other.isCollided = true;
@@ -217,10 +220,8 @@ export class Car {
     }
 
     private getNearestLightInCorridor(lights: TrafficLight[], ux: number, uy: number, grid: GridCell[][]): TrafficLight | null {
-        const gx = Math.floor(this.position.x), gy = Math.floor(this.position.y);
-        const cell = grid[gy]?.[gx];
-        const roadDir = cell?.allowedDirections[0];
-        if (!roadDir) return null;
+        // Determine heading from actual movement direction, not grid cell
+        const heading = this.getHeading(ux, uy);
 
         let best: TrafficLight | null = null;
         let minDist = 10;
@@ -231,17 +232,21 @@ export class Car {
             const lDir = lParts[1].charAt(0); 
             let relevant = false;
             
-            if (lDir === 'n' && roadDir === 'SOUTH') relevant = true;
-            if (lDir === 's' && roadDir === 'NORTH') relevant = true;
-            if (lDir === 'e' && roadDir === 'WEST') relevant = true;
-            if (lDir === 'w' && roadDir === 'EAST') relevant = true;
+            // Light direction indicates which traffic it controls:
+            // 'n' lights control SOUTHBOUND traffic (cars heading SOUTH see 'n' lights)
+            // 's' lights control NORTHBOUND traffic (cars heading NORTH see 's' lights)
+            if (lDir === 'n' && heading === 'SOUTH') relevant = true;
+            if (lDir === 's' && heading === 'NORTH') relevant = true;
+            if (lDir === 'e' && heading === 'WEST') relevant = true;
+            if (lDir === 'w' && heading === 'EAST') relevant = true;
             if (!relevant) continue;
 
             const ldx = l.position.x - this.position.x, ldy = l.position.y - this.position.y;
             const dot = ldx * ux + ldy * uy;
             const cross = Math.abs(ldx * uy - ldy * ux);
             
-            if (dot > -0.5 && dot < minDist && cross < 1.5) { minDist = dot; best = l; }
+            // Wide corridor (0.8 units) to capture lights in this lane only
+            if (dot > -0.5 && dot < minDist && cross < 0.8) { minDist = dot; best = l; }
         }
         return best;
     }
