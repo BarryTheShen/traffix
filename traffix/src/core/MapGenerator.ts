@@ -52,13 +52,15 @@ export class MapGenerator {
         }
     }
 
-    public static addIntersection(grid: GridCell[][], cx: number, cy: number, radius: number = 2) {
+    public static addIntersection(grid: GridCell[][], cx: number, cy: number, radius: number = 2, intersectionId?: string) {
+        const intId = intersectionId || `int_${cx}_${cy}`;
         for (let y = cy - radius; y < cy + radius; y++) {
             for (let x = cx - radius; x < cx + radius; x++) {
                 if (y >= 0 && y < grid.length && x >= 0 && x < grid[0].length) {
                     if (grid[y][x].type === 'road' || grid[y][x].type === 'intersection') {
                         grid[y][x].type = 'intersection';
                         grid[y][x].allowedDirections = ['NORTH', 'SOUTH', 'EAST', 'WEST'];
+                        grid[y][x].intersectionId = intId;
                     }
                 }
             }
@@ -138,7 +140,7 @@ export class MapGenerator {
              return this.generateRandomLevel(width, height);
         }
 
-        intersections.forEach(i => this.addIntersection(grid, i.x, i.y, 2));
+        intersections.forEach((i, idx) => this.addIntersection(grid, i.x, i.y, 2, `int${idx}`));
         this.finalizeMap(grid);
 
         return { grid, intersections };
@@ -148,7 +150,7 @@ export class MapGenerator {
         const grid = this.createEmptyGrid(width, height);
         const xAnchors = [15, 40, 65];
         const yAnchors = [10, 20, 30];
-        
+
         const potentialEdges: {n1: any, n2: any}[] = [];
         for (let i = 0; i < xAnchors.length; i++) {
             for (let j = 0; j < yAnchors.length; j++) {
@@ -190,7 +192,7 @@ export class MapGenerator {
             const [x, y] = s.split(',').map(Number);
             let count = 0;
             if (x === 15 || x === 65 || y === 10 || y === 30) {
-                count = 1; 
+                count = 1;
             }
             entranceConnections.set(s, count);
         });
@@ -214,17 +216,17 @@ export class MapGenerator {
         const intersections: {x: number, y: number}[] = [];
         nodes.forEach(s => {
             const [nx, ny] = s.split(',').map(Number);
-            const connEdges = activeEdges.filter(e => 
+            const connEdges = activeEdges.filter(e =>
                 (e.n1.x === nx && e.n1.y === ny) || (e.n2.x === nx && e.n2.y === ny)
             );
             const internalConnections = connEdges.length;
             const totalConnections = internalConnections + (entranceConnections.get(s) || 0);
-            
+
             let isJunction = totalConnections >= 3;
             if (totalConnections === 2) {
                 const hasEntranceX = (nx === 15 || nx === 65);
                 const hasEntranceY = (ny === 10 || ny === 30);
-                
+
                 let isStraight = false;
                 if (internalConnections === 2) {
                     const e1 = connEdges[0];
@@ -243,9 +245,11 @@ export class MapGenerator {
 
             if (isJunction) {
                 intersections.push({x: nx, y: ny});
-                this.addIntersection(grid, nx, ny, 2);
             }
         });
+
+        // Add intersections with proper IDs matching Simulation's naming
+        intersections.forEach((i, idx) => this.addIntersection(grid, i.x, i.y, 2, `int${idx}`));
 
         this.finalizeMap(grid);
         return { grid, intersections };

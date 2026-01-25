@@ -21,18 +21,27 @@ async function init() {
   };
 
   // Selection Logic
-  // Selection Logic
   const canvas = appContainer.querySelector('canvas');
-  canvas?.addEventListener('mousedown', (e) => {
+  canvas?.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    
-    const id = renderer.getVehicleAt(x, y, simulation.getState());
-    simulation.selectedVehicleId = id;
-    (window as any).renderer.debugMode = true; 
-    if (id) {
-      ui.log(`Selected: ${id}`);
+
+    // First check for vehicle selection
+    const vehicleId = renderer.getVehicleAt(x, y, simulation.getState());
+    if (vehicleId) {
+      simulation.selectedVehicleId = vehicleId;
+      (window as any).renderer.debugMode = true;
+      ui.log(`Selected: ${vehicleId}`);
+      return;
+    }
+
+    // Check for intersection click
+    const intersectionId = renderer.getIntersectionAt(x, y);
+    if (intersectionId) {
+      // Show popup at click position
+      ui.showIntersectionPopup(intersectionId, e.clientX, e.clientY);
+      ui.log(`Clicked intersection: ${intersectionId}`);
     }
   });
 

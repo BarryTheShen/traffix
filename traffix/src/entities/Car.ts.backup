@@ -1,0 +1,570 @@
+import type { GridCell, Vector2D, Direction } from '../core/types';
+import type { TrafficLight } from './TrafficLight';
+// import { Pathfinding } from '../core/Pathfinding';
+
+export class Car {
+    public id: string;
+    public position: Vector2D;
+    public destination: Vector2D | null = null;
+    public velocity: number = 0;
+    public maxVelocity: number = 0.5;
+    public acceleration: number = 0.006;
+    public deceleration: number = 0.05;
+    public path: Vector2D[] = [];
+    public currentTargetIndex: number = 0;
+    public debugState: string = 'IDLE';
+    public limitReason: string = 'NONE';
+    public stuckTimer: number = 0;
+    public spawnStuckTimer: number = 0;
+    public reactionTimer: number = 0;
+    public perceptionDelay: number = 30;
+    public startPos: Vector2D;
+
+    public isCollided: boolean = false;
+    public collisionTimer: number = 0;
+    public violatesRules: boolean = false;
+    public isWaiting: boolean = false;
+    public lifeTicks: number = 0;
+
+    // Lane change tracking (used for future lane changing implementation)
+    public laneChangeIntent: 'LEFT' | 'RIGHT' | null = null;
+    public laneChangeCooldown: number = 0;
+
+    private wasHardBlockedLastTick: boolean = false;
+
+    constructor(id: string, startPos: Vector2D) {
+        this.id = id;
+        this.position = { ...startPos };
+        this.startPos = { ...startPos };
+        this.maxVelocity = 0.4 + Math.random() * 0.1;
+    }
+
+    public update(lights: TrafficLight[], otherCars: Car[], grid: GridCell[][], timeScale: number = 1.0) {
+        this.limitReason = 'CRUISING';
+        this.lifeTicks++;
+        if (this.laneChangeCooldown > 0) this.laneChangeCooldown--;
+
+        if (this.isCollided) {
+            this.collisionTimer++;
+            this.velocity = 0;
+            this.isWaiting = true;
+            this.debugState = 'CRASHED';
+            return;
+        }
+
+        this.advanceWaypointsStrict();
+        if (this.currentTargetIndex >= this.path.length) {
+            this.debugState = 'ARRIVED';
+            this.velocity = 0;
+            this.isWaiting = false;
+            return;
+        }
+
+        const target = this.path[this.currentTargetIndex];
+        const dxT = target.x - this.position.x, dyT = target.y - this.position.y;
+        const distToT = Math.sqrt(dxT*dxT + dyT*dyT);
+        const ux = distToT > 0.01 ? dxT / distToT : 0;
+        const uy = distToT > 0.01 ? dyT / distToT : 0;
+
+        let limitDist = Infinity;
+        let obstacleVel = 0;
+        let isHardBlockedNow = false;
+
+        const baseAcc = this.acceleration * timeScale;
+        const baseDecel = this.deceleration * timeScale;
+
+        // Current cell type check
+        const gridX = Math.floor(this.position.x);
+        const gridY = Math.floor(this.position.y);
+        const currentCell = grid[gridY]?.[gridX];
+        // Track intersection state for debugging
+        this.debugState = currentCell?.type === 'intersection' ? 'IN_INTERSECTION' : 'ON_ROAD';
+
+        // 1. Traffic Light Detection
+        const light = this.getNearestLightInCorridor(lights, ux, uy, grid);
+        if (light && light.state !== 'GREEN') {
+            const dToL = Math.sqrt((light.position.x - this.position.x)**2 + (light.position.y - this.position.y)**2);
+            limitDist = dToL - 1.0;
+            this.limitReason = 'RED_LIGHT';
+            if (limitDist < 0.1) isHardBlockedNow = true;
+        }
+
+        // 2. Lead Vehicle Detection
+        const leadInfo = this.getLeadVehicleVector(otherCars, ux, uy);
+        if (leadInfo) {
+            const carStopDist = leadInfo.dist - 1.2;
+            if (carStopDist < limitDist) {
+                limitDist = carStopDist;
+                this.limitReason = 'CAR_AHEAD';
+                obstacleVel = leadInfo.velocity;
+                const other = otherCars.find(c => c.id === leadInfo.id);
+                if (other && leadInfo.dist < 1.6) {
+                    if (other.isWaiting || other.debugState === 'REACTING' || other.velocity < 0.01) {
+                        if (carStopDist < 0.15 || this.velocity < 0.01) isHardBlockedNow = true;
+                    }
+                }
+            }
+        }
+
+        // 2b. Cross-traffic conflict avoidance at intersections
+        // Check if we're approaching an intersection and there's cross-traffic we should yield to
+        const crossTrafficInfo = this.detectCrossTrafficConflict(otherCars, ux, uy, grid, currentCell);
+        if (crossTrafficInfo) {
+            const yieldDist = crossTrafficInfo.dist - 0.8;
+            if (yieldDist < limitDist) {
+                limitDist = yieldDist;
+                this.limitReason = 'YIELDING';
+                obstacleVel = 0;
+                if (yieldDist < 0.3) isHardBlockedNow = true;
+            }
+        }
+
+        // 2c. Proactive cross-traffic detection for collision avoidance
+        // Look further ahead for cars on crossing paths and brake early
+        const crossingCar = this.detectCrossingPath(otherCars, ux, uy, currentCell);
+        if (crossingCar) {
+            const brakeDist = crossingCar.dist - 1.0;
+            if (brakeDist < limitDist && brakeDist > 0) {
+                limitDist = brakeDist;
+                this.limitReason = 'CROSSING';
+                obstacleVel = 0;
+            }
+        }
+
+        // 3. Reaction State Machine
+        if (isHardBlockedNow) {
+            this.isWaiting = true;
+            this.wasHardBlockedLastTick = true;
+            this.reactionTimer = 0;
+        } else if (this.wasHardBlockedLastTick) {
+            if (this.velocity < 0.01) {
+                this.reactionTimer = this.perceptionDelay;
+            }
+            this.wasHardBlockedLastTick = false;
+        }
+
+        // 4. Physics Engine
+        if (this.isWaiting && this.reactionTimer > 0) {
+            this.reactionTimer--;
+            this.velocity = Math.max(0, this.velocity - baseDecel);
+            this.debugState = 'REACTING';
+            if (this.reactionTimer === 0) this.isWaiting = false;
+        } else if (isHardBlockedNow) {
+            this.velocity = 0;
+            this.debugState = 'STOPPED';
+        } else if (limitDist < Infinity) {
+            const v_diff = this.velocity - obstacleVel;
+            const brakingDist = v_diff > 0 ? (v_diff * v_diff) / (2 * baseDecel) : 0;
+            const safetyBuffer = (this.velocity * 4);
+
+            if (limitDist < brakingDist + safetyBuffer) {
+                const neededDecel = v_diff > 0 ? (v_diff * v_diff) / (2 * Math.max(0.01, limitDist)) : baseDecel;
+                const applied = Math.min(Math.max(neededDecel * 1.1, baseDecel), baseDecel * 15);
+                this.velocity = Math.max(obstacleVel, this.velocity - applied);
+                this.debugState = 'BRAKING';
+            } else {
+                const catchUpSpeed = obstacleVel + (limitDist * 0.1);
+                const targetVel = Math.min(this.maxVelocity * timeScale, catchUpSpeed);
+                if (this.velocity < targetVel - 0.001) {
+                    this.velocity = Math.min(this.velocity + baseAcc, targetVel);
+                    this.debugState = 'FOLLOWING';
+                } else if (this.velocity > targetVel + 0.001) {
+                    this.velocity = Math.max(targetVel, this.velocity - baseDecel * 0.5);
+                    this.debugState = 'MATCHING';
+                } else {
+                    this.velocity = targetVel;
+                    this.debugState = 'LOCKED';
+                }
+            }
+        } else {
+            this.velocity = Math.min(this.velocity + baseAcc, this.maxVelocity * timeScale);
+            this.debugState = 'ACCEL';
+        }
+
+        if (this.velocity < 0.001) this.velocity = 0;
+
+        // 5. Movement with Collision Detection
+        const moveDist = Math.min(this.velocity, distToT);
+        if (moveDist > 0) {
+            const nextX = this.position.x + ux * moveDist;
+            const nextY = this.position.y + uy * moveDist;
+            let restricted = false;
+
+            for (const other of otherCars) {
+                if (other.id === this.id) continue;
+                const dxO = other.position.x - nextX, dyO = other.position.y - nextY;
+                const dSq = dxO*dxO + dyO*dyO;
+                const crossLateral = Math.abs(dxO * uy - dyO * ux);
+
+                // Same-lane following - restrict movement when close
+                if (dSq < 2.25) {  // 1.5 cells distance - stop earlier
+                    const dot = dxO * ux + dyO * uy;
+                    if (dot > 0 && crossLateral < 0.65) {  // Slightly wider lane tolerance
+                        restricted = true;
+                        // Only mark as collision for actual overlap
+                        const isHighSpeedImpact = this.velocity > 0.35 && dSq < 0.16;  // Very strict
+                        const isSevereOverlap = dSq < 0.12;  // Very strict - 0.35 cells
+                        if ((isHighSpeedImpact || isSevereOverlap) && other.lifeTicks > 90) {
+                            this.isCollided = true;
+                            other.isCollided = true;
+                        }
+                        break;
+                    }
+                }
+
+                // Cross-traffic collision prevention (in intersections)
+                // Trigger restriction earlier to prevent the collision
+                if (dSq < 1.21 && crossLateral > 0.2 && other.velocity > 0.02) {  // Expanded check zone
+                    const otherTarget = other.path[other.currentTargetIndex];
+                    if (otherTarget) {
+                        const odx = otherTarget.x - other.position.x;
+                        const ody = otherTarget.y - other.position.y;
+                        const oLen = Math.sqrt(odx*odx + ody*ody);
+                        if (oLen > 0.01) {
+                            const oux = odx / oLen, ouy = ody / oLen;
+                            const headingDot = ux * oux + uy * ouy;
+                            // Paths are crossing (not parallel)
+                            if (headingDot < 0.75 && headingDot > -0.75) {
+                                restricted = true;
+                                // Only mark as collision if severely overlapping
+                                if (dSq < 0.16 && other.lifeTicks > 40 && this.velocity > 0.15) {
+                                    this.isCollided = true;
+                                    other.isCollided = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!restricted) {
+                this.position.x = nextX;
+                this.position.y = nextY;
+            } else {
+                this.velocity = 0;
+            }
+        }
+
+        // 6. Stuck detection
+        if (this.velocity < 0.01) {
+            this.stuckTimer++;
+            const dSq = (this.position.x - this.startPos.x)**2 + (this.position.y - this.startPos.y)**2;
+            if (dSq < 1.0) this.spawnStuckTimer++;
+        } else {
+            this.stuckTimer = 0;
+            this.spawnStuckTimer = 0;
+        }
+    }
+
+    /**
+     * Checks if lane change is safe: diagonal front, beside, diagonal back must be clear
+     * @returns true if lane change is safe
+     */
+    public canChangeLane(direction: 'LEFT' | 'RIGHT', otherCars: Car[], ux: number, uy: number): boolean {
+        const lateralDir = direction === 'LEFT' ? 1 : -1;
+        // Perpendicular vector (rotate 90 degrees)
+        const perpX = -uy * lateralDir;
+        const perpY = ux * lateralDir;
+
+        // Check positions: diagonal front, beside, diagonal back
+        const checkPoints = [
+            { dx: ux + perpX, dy: uy + perpY },    // Diagonal front
+            { dx: perpX, dy: perpY },               // Beside
+            { dx: -ux + perpX, dy: -uy + perpY }   // Diagonal back
+        ];
+
+        for (const other of otherCars) {
+            if (other.id === this.id) continue;
+            const relX = other.position.x - this.position.x;
+            const relY = other.position.y - this.position.y;
+            const dist = Math.sqrt(relX*relX + relY*relY);
+
+            if (dist < 2.5) {
+                // Check if other car is in any of the danger zones
+                for (const check of checkPoints) {
+                    const dotFwd = relX * check.dx + relY * check.dy;
+                    if (dotFwd > 0 && dist < 1.8) {
+                        return false; // Car in the way
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Detect cross-traffic that would conflict with this car's path in/near an intersection.
+     * Returns info about the closest conflicting vehicle if yielding is required.
+     */
+    private detectCrossTrafficConflict(
+        otherCars: Car[],
+        ux: number,
+        uy: number,
+        grid: GridCell[][],
+        currentCell: GridCell | undefined
+    ): { dist: number; id: string } | null {
+        // Only check when near or in an intersection
+        const isInOrNearIntersection = currentCell?.type === 'intersection' ||
+            this.isApproachingIntersection(grid, ux, uy);
+
+        if (!isInOrNearIntersection) return null;
+
+        // Don't yield forever - break deadlocks after being stuck too long
+        if (this.stuckTimer > 180) { // 3 seconds stuck = try to proceed
+            return null;
+        }
+
+        const myHeading = this.getHeading(ux, uy);
+        let bestConflict: { dist: number; id: string } | null = null;
+        let minDist = 4.0; // Reduced from 6.0 - only yield when close
+
+        for (const other of otherCars) {
+            if (other.id === this.id) continue;
+            if (other.isCollided) continue;
+
+            // Skip if other car is also stuck - avoid mutual deadlock
+            if (other.stuckTimer > 120) continue;
+
+            // Get other car's heading
+            const otherTarget = other.path[other.currentTargetIndex];
+            if (!otherTarget) continue;
+
+            const odx = otherTarget.x - other.position.x;
+            const ody = otherTarget.y - other.position.y;
+            const oLen = Math.sqrt(odx * odx + ody * ody);
+            if (oLen < 0.01) continue;
+
+            const oux = odx / oLen;
+            const ouy = ody / oLen;
+            const otherHeading = this.getHeading(oux, ouy);
+
+            // Check if headings are conflicting (perpendicular)
+            const isConflicting = this.areHeadingsConflicting(myHeading, otherHeading);
+            if (!isConflicting) continue;
+
+            // Calculate distance and relative position
+            const dx = other.position.x - this.position.x;
+            const dy = other.position.y - this.position.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > minDist) continue;
+
+            // Check if the other car is in our path's conflict zone
+            // (ahead of us or to our side, moving to cross our path)
+            const dot = dx * ux + dy * uy; // How far ahead is other car?
+            const cross = dx * uy - dy * ux; // Which side is other car on?
+
+            // Only yield to cars that are:
+            // 1. Very close (within 4 cells)
+            // 2. Actually ahead of us or immediately beside us
+            // 3. Moving actively (not stopped)
+            if (dot > -0.5 && dot < 3.0 && Math.abs(cross) < 2.5) {
+                // Only yield if other car is actively moving
+                if (other.velocity > 0.08) {
+                    // Priority: car on the right has right-of-way
+                    const otherHasPriority = this.shouldYieldTo(other, cross, myHeading, otherHeading);
+
+                    if (otherHasPriority && dist < minDist) {
+                        minDist = dist;
+                        bestConflict = { dist, id: other.id };
+                    }
+                }
+            }
+        }
+
+        return bestConflict;
+    }
+
+    /**
+     * Detect cars on crossing paths that would collide if both continue.
+     * Uses trajectory prediction to find collision points.
+     */
+    private detectCrossingPath(
+        otherCars: Car[],
+        ux: number,
+        uy: number,
+        currentCell: GridCell | undefined
+    ): { dist: number; id: string } | null {
+        // Only check in or near intersections
+        if (currentCell?.type !== 'intersection') return null;
+
+        const myHeading = this.getHeading(ux, uy);
+        let closestCrossing: { dist: number; id: string } | null = null;
+        let minDist = 3.5; // Look for crossing cars within 3.5 cells
+
+        for (const other of otherCars) {
+            if (other.id === this.id) continue;
+            if (other.isCollided) continue;
+            if (other.velocity < 0.02) continue; // Skip stopped cars
+
+            const otherTarget = other.path[other.currentTargetIndex];
+            if (!otherTarget) continue;
+
+            const odx = otherTarget.x - other.position.x;
+            const ody = otherTarget.y - other.position.y;
+            const oLen = Math.sqrt(odx * odx + ody * ody);
+            if (oLen < 0.01) continue;
+
+            const oux = odx / oLen;
+            const ouy = ody / oLen;
+            const otherHeading = this.getHeading(oux, ouy);
+
+            // Only care about perpendicular paths
+            if (!this.areHeadingsConflicting(myHeading, otherHeading)) continue;
+
+            // Calculate relative position
+            const dx = other.position.x - this.position.x;
+            const dy = other.position.y - this.position.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist > 5.0) continue;
+
+            // Predict if paths will cross
+            // Time to collision point for each car
+            const myTimeToPoint = dist / Math.max(this.velocity, 0.05);
+            const otherTimeToPoint = dist / Math.max(other.velocity, 0.05);
+
+            // If both would reach the same area at similar times, there's a conflict
+            const timeDiff = Math.abs(myTimeToPoint - otherTimeToPoint);
+
+            // If timing is close (both arriving around same time), and we should yield
+            if (timeDiff < 30 && dist < minDist) {
+                // Yield to cars that will arrive first or are on our right
+                const otherArrivesSooner = other.velocity > this.velocity * 0.8;
+                const crossProduct = dx * uy - dy * ux;
+                const otherOnRight = crossProduct < 0;
+
+                if (otherArrivesSooner || otherOnRight) {
+                    minDist = dist;
+                    closestCrossing = { dist, id: other.id };
+                }
+            }
+        }
+
+        return closestCrossing;
+    }
+
+    /**
+     * Check if we're approaching an intersection (within a few cells)
+     */
+    private isApproachingIntersection(grid: GridCell[][], ux: number, uy: number): boolean {
+        // Check cells ahead (up to 3 cells forward)
+        for (let d = 1; d <= 3; d++) {
+            const checkX = Math.floor(this.position.x + ux * d);
+            const checkY = Math.floor(this.position.y + uy * d);
+            const cell = grid[checkY]?.[checkX];
+            if (cell?.type === 'intersection') return true;
+        }
+        return false;
+    }
+
+    /**
+     * Determine if two headings would cause a collision (perpendicular paths)
+     */
+    private areHeadingsConflicting(h1: Direction, h2: Direction): boolean {
+        const perpendicular: Record<Direction, Direction[]> = {
+            'NORTH': ['EAST', 'WEST'],
+            'SOUTH': ['EAST', 'WEST'],
+            'EAST': ['NORTH', 'SOUTH'],
+            'WEST': ['NORTH', 'SOUTH']
+        };
+        return perpendicular[h1].includes(h2);
+    }
+
+    /**
+     * Determine if this car should yield to another car.
+     * Uses right-of-way rules: car on the right has priority.
+     * Also considers which car entered the intersection first.
+     */
+    private shouldYieldTo(other: Car, crossProduct: number, _myHeading: Direction, _otherHeading: Direction): boolean {
+        // If other car is already in intersection (low velocity but committed), yield
+        if (other.lifeTicks > this.lifeTicks + 60) {
+            // Other car has been around longer - they likely entered first
+            return true;
+        }
+
+        // Right-of-way based on position relative to heading
+        // In right-hand traffic, car on the right has priority
+        // crossProduct > 0 means other car is to our left (we have priority)
+        // crossProduct < 0 means other car is to our right (they have priority)
+
+        // However, this depends on heading orientation
+        // For now, use simple rule: if other car is closer to intersection center, yield
+        if (other.velocity > 0.1 && this.velocity < 0.15) {
+            // Other car is moving, we're slow - yield
+            return true;
+        }
+
+        // Yield to car on our right (right-of-way rule)
+        // The sign of crossProduct depends on heading orientation
+        const yieldBasedOnPosition = crossProduct < 0; // Other on our right
+
+        return yieldBasedOnPosition;
+    }
+
+    private getLeadVehicleVector(others: Car[], ux: number, uy: number): { dist: number, velocity: number, id: string } | null {
+        let bestDist = 15;
+        let bestInfo: { dist: number, velocity: number, id: string } | null = null;
+        for (const other of others) {
+            if (other.id === this.id) continue;
+            const dx = other.position.x - this.position.x;
+            const dy = other.position.y - this.position.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > bestDist) continue;
+            const dot = dx * ux + dy * uy;
+            const cross = Math.abs(dx * uy - dy * ux);
+            if (dot > 0 && cross < 0.4) {
+                bestDist = dot;
+                bestInfo = { dist: dot, velocity: other.velocity, id: other.id };
+            }
+        }
+        return bestInfo;
+    }
+
+    private advanceWaypointsStrict() {
+        if (this.currentTargetIndex >= this.path.length) return;
+        const target = this.path[this.currentTargetIndex];
+        const dx = target.x - this.position.x, dy = target.y - this.position.y;
+        const isLast = this.currentTargetIndex === this.path.length - 1;
+        const reachThreshold = isLast ? 0.5 : 0.04;
+        if (dx*dx + dy*dy < reachThreshold) { this.currentTargetIndex++; return; }
+        if (dx*dx + dy*dy > 9.0) return;
+        const prev = (this.currentTargetIndex === 0) ? this.startPos : this.path[this.currentTargetIndex - 1];
+        const segX = target.x - prev.x, segY = target.y - prev.y;
+        const carToTargetX = target.x - this.position.x, carToTargetY = target.y - this.position.y;
+        if (segX * carToTargetX + segY * carToTargetY < 0) this.currentTargetIndex++;
+    }
+
+    private getNearestLightInCorridor(lights: TrafficLight[], ux: number, uy: number, _grid: GridCell[][]): TrafficLight | null {
+        const heading = this.getHeading(ux, uy);
+
+        let best: TrafficLight | null = null;
+        let minDist = 10;
+        for (const l of lights) {
+            if (l.state === 'GREEN') continue;
+            const lParts = l.id.split('_');
+            if (lParts.length < 2) continue;
+            const lDir = lParts[1].charAt(0);
+            let relevant = false;
+
+            if (lDir === 'n' && heading === 'SOUTH') relevant = true;
+            if (lDir === 's' && heading === 'NORTH') relevant = true;
+            if (lDir === 'e' && heading === 'WEST') relevant = true;
+            if (lDir === 'w' && heading === 'EAST') relevant = true;
+            if (!relevant) continue;
+
+            const ldx = l.position.x - this.position.x, ldy = l.position.y - this.position.y;
+            const dot = ldx * ux + ldy * uy;
+            const cross = Math.abs(ldx * uy - ldy * ux);
+
+            if (dot > -0.5 && dot < minDist && cross < 0.8) { minDist = dot; best = l; }
+        }
+        return best;
+    }
+
+    private getHeading(dx: number, dy: number): Direction {
+        if (Math.abs(dx) > Math.abs(dy)) return dx > 0 ? 'EAST' : 'WEST';
+        return dy > 0 ? 'SOUTH' : 'NORTH';
+    }
+}

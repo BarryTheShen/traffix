@@ -1,11 +1,14 @@
-import { Simulation } from '../core/Simulation';
+import { Simulation, GAME_VERSION } from '../core/Simulation';
 import type { SimulationState } from '../core/types';
+import { Intersection } from '../core/Intersection';
+import type { TrafficLightPreset } from '../core/Intersection';
 
 export class UI {
     private container: HTMLElement;
     private simulation: Simulation;
     private logEl: HTMLElement | null = null;
     private scoreEl: HTMLElement | null = null;
+    private intersectionPopup: HTMLElement | null = null;
 
     constructor(container: HTMLElement, simulation: Simulation) {
         this.container = container;
@@ -18,10 +21,10 @@ export class UI {
         overlay.style.position = 'absolute';
         overlay.style.top = '10px';
         overlay.style.right = '10px';
-        overlay.style.width = '300px';
-        overlay.style.background = 'rgba(0, 0, 0, 0.8)';
+        overlay.style.width = '320px';
+        overlay.style.background = 'rgba(0, 0, 0, 0.85)';
         overlay.style.color = '#fff';
-        overlay.style.padding = '10px';
+        overlay.style.padding = '12px';
         overlay.style.fontFamily = 'monospace';
         overlay.style.borderRadius = '8px';
         overlay.style.pointerEvents = 'auto';
@@ -29,128 +32,153 @@ export class UI {
         overlay.style.overflowY = 'auto';
 
         overlay.innerHTML = `
-            <div style="margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; border-bottom: 1px solid #555; padding-bottom: 5px;">
                 <h3 style="margin: 0; color: #3498db;">Traffix Controls</h3>
+                <span id="version-display" style="color: #7f8c8d; font-size: 0.8rem;">${GAME_VERSION}</span>
             </div>
-            
-            <div id="spawn-stuck-warning" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(231, 76, 60, 0.95); color: white; padding: 15px 30px; font-size: 1.5rem; border-radius: 8px; font-weight: bold; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.5); z-index: 9999;">
-                ⚠️ SPAWN BLOCKED! ⚠️
-                <div style="font-size: 0.9rem; margin-top: 5px;">Clear traffic or Game Over!</div>
-                <div id="countdown-timer" style="font-size: 2.5rem; margin-top: 8px; color: #f1c40f;">10</div>
+
+            <div id="spawn-stuck-warning" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(231, 76, 60, 0.95); color: white; padding: 20px 40px; font-size: 1.5rem; border-radius: 12px; font-weight: bold; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.7); z-index: 9999;">
+                SPAWN BLOCKED!
+                <div style="font-size: 0.9rem; margin-top: 8px;">Clear traffic or Game Over!</div>
+                <div id="countdown-timer" style="font-size: 3rem; margin-top: 10px; color: #f1c40f;">10</div>
             </div>
 
             <div class="stats-panel">
                 <div>Score: <span id="score-val" style="color: #2ecc71; font-weight: bold;">0</span></div>
-                <div style="font-size: 0.8rem; color: #aaa;">Exited: <span id="exited-val">0</span></div>
+                <div style="font-size: 0.8rem; color: #aaa;">Exited: <span id="exited-val">0</span> | Vehicles: <span id="vehicle-count">0</span></div>
                 <div style="font-size: 0.8rem; color: #aaa; margin-top: 2px;">Spawn Rate: <span id="current-spawn-val" style="color: #3498db;">0.0</span>/s</div>
             </div>
 
             <div class="control-panel" style="margin-top: 10px;">
                 <div class="input-group">
-                    <label>Sim Speed:</label>
+                    <label>Sim Speed: <span id="speed-val">1.0x</span></label>
                     <input type="range" id="sim-speed" min="0.1" max="5.0" step="0.1" value="1.0" style="width: 100%;">
-                    <span id="speed-val">1.0x</span>
-                </div>
-                
-                <div style="display: flex; gap: 5px; margin-top: 5px;">
-                    <button id="pause-sim" style="flex: 1; padding: 5px; background: #f39c12; border: none; color: white; border-radius: 4px; cursor: pointer;">Pause</button>
-                    <button id="reset-sim" style="flex: 1; padding: 5px; background: #95a5a6; border: none; color: white; border-radius: 4px; cursor: pointer;">Reset Sim</button>
-                    <button id="back-menu" style="flex: 1; padding: 5px; background: #34495e; border: none; color: white; border-radius: 4px; cursor: pointer;">Menu</button>
+                    <div style="font-size: 0.7rem; color: #888;">Tip: Arrow keys or Space to pause</div>
                 </div>
 
-                <div style="margin-top: 5px;">
-                     <button id="reset-rules" style="width: 100%; padding: 4px; background: #7f8c8d; border: 1px dashed #aaa; color: #ddd; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Reset Light Rules</button>
+                <div style="display: flex; gap: 5px; margin-top: 8px;">
+                    <button id="pause-sim" style="flex: 1; padding: 6px; background: #f39c12; border: none; color: white; border-radius: 4px; cursor: pointer;">Pause</button>
+                    <button id="reset-sim" style="flex: 1; padding: 6px; background: #95a5a6; border: none; color: white; border-radius: 4px; cursor: pointer;">Reset</button>
+                    <button id="back-menu" style="flex: 1; padding: 6px; background: #34495e; border: none; color: white; border-radius: 4px; cursor: pointer;">Menu</button>
                 </div>
-                
-                <div style="margin-top: 10px;">
+
+                <div style="margin-top: 8px;">
+                     <button id="reset-rules" style="width: 100%; padding: 5px; background: #7f8c8d; border: 1px dashed #aaa; color: #ddd; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Reset Light Rules to Default</button>
+                </div>
+
+                <div style="margin-top: 12px;">
                     <label style="display: flex; align-items: center; color: white; gap: 5px; font-size: 0.9rem; cursor: pointer;">
                         <input type="checkbox" id="debug-toggle"> Enable Debug / Cheats
                     </label>
                 </div>
 
                 <div id="debug-panel" style="display: none; margin-top: 10px; padding: 10px; border: 1px solid #c0392b; border-radius: 4px; background: rgba(192, 57, 43, 0.1);">
-                    <div style="color: #e74c3c; font-weight: bold; margin-bottom: 5px;">Debug / Cheats</div>
-                    
-                    <div style="margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px;">
-                        <div style="font-size: 0.8rem; color: #f1c40f; margin-bottom: 5px;">Car Capabilities:</div>
+                    <div style="color: #e74c3c; font-weight: bold; margin-bottom: 8px;">Debug Panel</div>
+
+                    <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size: 0.8rem; color: #3498db; margin-bottom: 5px;">Spawn Controls:</div>
+                        <div class="input-group">
+                            <label style="font-size: 0.75rem;">Base Rate:</label>
+                            <input type="range" id="spawn-rate" min="0.0" max="5.0" step="0.1" value="1.0" style="width: 65%;">
+                            <span id="spawn-rate-val" style="font-size: 0.75rem;">1.0x</span>
+                        </div>
+                        <div style="display: flex; gap: 5px; margin-top: 5px;">
+                            <button id="spawn-manual" style="flex: 1; padding: 4px; background: #27ae60; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">+ Spawn Car</button>
+                            <button id="clear-cars" style="flex: 1; padding: 4px; background: #c0392b; border: none; color: white; border-radius: 4px; cursor: pointer; font-size: 0.8rem;">Clear All Cars</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size: 0.8rem; color: #f1c40f; margin-bottom: 5px;">Car Physics:</div>
                         <div class="input-group">
                             <label style="font-size: 0.7rem;">Accel:</label>
-                            <input type="range" id="car-accel" min="0.001" max="0.5" step="0.001" value="0.02" style="width: 70%;">
-                            <span id="accel-val" style="font-size: 0.7rem;">0.020</span>
+                            <input type="range" id="car-accel" min="0.001" max="0.05" step="0.001" value="0.008" style="width: 60%;">
+                            <span id="accel-val" style="font-size: 0.7rem;">0.008</span>
                         </div>
-                        <div class="input-group" style="margin-top: 2px;">
+                        <div class="input-group" style="margin-top: 3px;">
                             <label style="font-size: 0.7rem;">Decel:</label>
-                            <input type="range" id="car-decel" min="0.01" max="2.0" step="0.01" value="0.05" style="width: 70%;">
-                            <span id="decel-val" style="font-size: 0.7rem;">0.05</span>
+                            <input type="range" id="car-decel" min="0.005" max="0.1" step="0.001" value="0.025" style="width: 60%;">
+                            <span id="decel-val" style="font-size: 0.7rem;">0.025</span>
                         </div>
-                        <div class="input-group" style="margin-top: 2px;">
+                        <div class="input-group" style="margin-top: 3px;">
+                            <label style="font-size: 0.7rem;">React:</label>
+                            <input type="range" id="car-reaction" min="5" max="60" step="1" value="20" style="width: 60%;">
+                            <span id="reaction-val" style="font-size: 0.7rem;">20 ticks</span>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size: 0.8rem; color: #9b59b6; margin-bottom: 5px;">Behavior:</div>
+                        <div class="input-group">
                             <label style="font-size: 0.7rem;">Rebel%:</label>
-                            <input type="range" id="rebel-chance" min="0" max="10" step="0.5" value="0.5" style="width: 70%;">
-                            <span id="rebel-val" style="font-size: 0.7rem;">0.5%</span>
+                            <input type="range" id="rebel-chance" min="0" max="10" step="0.1" value="0" style="width: 65%;">
+                            <span id="rebel-val" style="font-size: 0.7rem;">0%</span>
                         </div>
-                        <div style="margin-top: 5px;">
-                            <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #ff00ff;">
-                                <input type="checkbox" id="rebel-debug"> Color Rebels 👾
+                        <div style="margin-top: 5px; display: flex; flex-direction: column; gap: 3px;">
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: #ff00ff; cursor: pointer;">
+                                <input type="checkbox" id="rebel-debug"> Color Rebels
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: #e67e22; cursor: pointer;">
+                                <input type="checkbox" id="unstuck-timer-toggle"> Enable Unstuck Timer
                             </label>
                         </div>
                     </div>
 
-                    <div class="input-group" style="margin-top: 5px;">
-                        <label>Spawn Rate:</label>
-                        <input type="range" id="spawn-rate" min="0.0" max="50.0" step="0.5" value="1.0" style="width: 100%;">
-                        <span id="spawn-rate-val">1.0x</span>
-                    </div>
-                    
-                    <div class="input-group" style="margin-top: 8px;">
-                        <label title="Points deducted per crash">Crash Penalty:</label>
-                        <input type="number" id="crash-penalty" value="1000" step="100" style="width: 60px; background: #333; color: white; border: none; border-radius: 2px;">
-                    </div>
-
-                    <div class="input-group" style="margin-top: 5px;">
-                        <label title="How long crashed cars block traffic (ticks)">Crash Blockade:</label>
-                        <input type="number" id="crash-timeout" value="1800" step="100" style="width: 60px; background: #333; color: white; border: none; border-radius: 2px;">
-                    </div>
-
-                     <div class="input-group" style="margin-top: 5px;">
-                        <label title="How long before Game Over at entry (ticks)">Entry Timeout:</label>
-                        <input type="number" id="gameover-timeout" value="1200" step="100" style="width: 60px; background: #333; color: white; border: none; border-radius: 2px;">
+                    <div style="margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div style="font-size: 0.8rem; color: #e74c3c; margin-bottom: 5px;">Timeouts (ticks):</div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; font-size: 0.7rem;">
+                            <div>
+                                <label>Crash Cleanup:</label>
+                                <input type="number" id="crash-timeout" value="300" step="60" style="width: 50px; background: #333; color: white; border: 1px solid #555; border-radius: 2px;">
+                            </div>
+                            <div>
+                                <label>Game Over:</label>
+                                <input type="number" id="gameover-timeout" value="3000" step="100" style="width: 50px; background: #333; color: white; border: 1px solid #555; border-radius: 2px;">
+                            </div>
+                        </div>
+                        <div style="margin-top: 5px; font-size: 0.7rem;">
+                            <label>Crash Penalty:</label>
+                            <input type="number" id="crash-penalty" value="1000" step="100" style="width: 60px; background: #333; color: white; border: 1px solid #555; border-radius: 2px;">
+                        </div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 10px;">
-                        <button id="spawn-manual" style="padding: 5px; background: #27ae60; border: none; color: white; border-radius: 4px; cursor: pointer;">+ Car</button>
-                        <button id="clear-cars" style="padding: 5px; background: #c0392b; border: none; color: white; border-radius: 4px; cursor: pointer;">Clear All</button>
-                    </div>
-                     <div style="margin-top: 10px;">
-                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem;">
-                            <input type="checkbox" id="debug-draw" checked> Show Paths/Debug
+                    <div>
+                        <div style="font-size: 0.8rem; color: #2ecc71; margin-bottom: 5px;">Visual Debug:</div>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; cursor: pointer;">
+                            <input type="checkbox" id="debug-draw" checked> Show Paths & Debug Info
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; cursor: pointer; margin-top: 3px;">
+                            <input type="checkbox" id="show-queues" checked> Show Spawn Queues
                         </label>
                     </div>
                 </div>
             </div>
 
-            <div style="margin-top: 15px; border-top: 1px solid #555; padding-top: 5px;">
+            <div style="margin-top: 15px; border-top: 1px solid #555; padding-top: 8px;">
                 <h4 style="margin: 0 0 5px 0; color: #aaa;">Legend</h4>
-                <div style="font-size: 0.8rem; display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; background:#f1c40f;"></span> Moving</div>
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; background:#e67e22;"></span> Stuck</div>
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; background:#e74c3c;"></span> Blocked (Entry)</div>
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; background:#8e44ad;"></span> Crashed</div>
-                    <div style="display:flex; align-items:center; gap:5px;"><span style="display:inline-block; width:10px; height:10px; background:#3498db;"></span> Selected</div>
+                <div style="font-size: 0.75rem; display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                    <div style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; background:#f1c40f;"></span> Moving</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; background:#e67e22;"></span> Stuck</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; background:#e74c3c;"></span> Blocked</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; background:#8e44ad;"></span> Crashed</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; background:#3498db;"></span> Selected</div>
+                    <div style="display:flex; align-items:center; gap:4px;"><span style="display:inline-block; width:10px; height:10px; background:#ff00ff;"></span> Rebel</div>
                 </div>
             </div>
 
-            <div id="selection-info" style="margin-top: 15px; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 4px; min-height: 40px;">
-                Click a car to track path
+            <div id="selection-info" style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; min-height: 50px;">
+                <div style="color: #888; font-size: 0.85rem;">Click a car to track its path</div>
             </div>
 
             <div style="margin-top: 15px;">
-                <h4 style="margin: 0 0 5px 0; color: #f1c40f;">Traffic Lights</h4>
-                <div id="lights-list"></div>
+                <h4 style="margin: 0 0 8px 0; color: #f1c40f;">Traffic Lights</h4>
+                <div style="font-size: 0.75rem; color: #888; margin-bottom: 8px;">Click intersections on map or configure below</div>
+                <div id="lights-list" style="max-height: 300px; overflow-y: auto;"></div>
             </div>
 
-            <div style="margin-top: 15px; border-top: 1px solid #555; padding-top: 5px;">
+            <div style="margin-top: 15px; border-top: 1px solid #555; padding-top: 8px;">
                 <h4 style="margin: 0 0 5px 0;">Log</h4>
-                <div id="sim-log" style="height: 100px; overflow-y: auto; font-size: 0.8rem; color: #aaa;"></div>
+                <div id="sim-log" style="height: 80px; overflow-y: auto; font-size: 0.75rem; color: #aaa; background: rgba(0,0,0,0.3); padding: 5px; border-radius: 4px;"></div>
             </div>
         `;
 
@@ -159,7 +187,70 @@ export class UI {
         this.scoreEl = document.getElementById('score-val');
 
         this.setupEventListeners();
+        this.setupKeyboardShortcuts();
         this.showStartScreen();
+    }
+
+    private setupKeyboardShortcuts() {
+        document.addEventListener('keydown', (e) => {
+            if ((e.target as HTMLElement).tagName === 'INPUT') return;
+
+            switch(e.code) {
+                case 'Space':
+                    e.preventDefault();
+                    this.togglePause();
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    this.adjustSpeed(0.5);
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    this.adjustSpeed(-0.5);
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    this.adjustSpeed(1.0);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    this.adjustSpeed(-1.0);
+                    break;
+            }
+        });
+    }
+
+    private togglePause() {
+        const speedSlider = document.getElementById('sim-speed') as HTMLInputElement;
+        const pauseBtn = document.getElementById('pause-sim');
+
+        if (this.simulation.timeScale === 0) {
+            const val = parseFloat(speedSlider?.value || '1.0');
+            this.simulation.timeScale = val;
+            if (pauseBtn) pauseBtn.innerText = 'Pause';
+        } else {
+            this.simulation.timeScale = 0;
+            if (pauseBtn) pauseBtn.innerText = 'Resume';
+        }
+        this.updateSpeedDisplay();
+    }
+
+    private adjustSpeed(delta: number) {
+        const speedSlider = document.getElementById('sim-speed') as HTMLInputElement;
+        if (!speedSlider) return;
+
+        let newVal = parseFloat(speedSlider.value) + delta;
+        newVal = Math.max(0.1, Math.min(5.0, newVal));
+        speedSlider.value = newVal.toString();
+        this.simulation.timeScale = newVal;
+        this.updateSpeedDisplay();
+    }
+
+    private updateSpeedDisplay() {
+        const speedVal = document.getElementById('speed-val');
+        if (speedVal) {
+            speedVal.innerText = this.simulation.timeScale.toFixed(1) + 'x';
+        }
     }
 
     private setupEventListeners() {
@@ -167,7 +258,7 @@ export class UI {
         speedSlider?.addEventListener('input', (e) => {
             const val = parseFloat((e.target as HTMLInputElement).value);
             this.simulation.timeScale = val;
-            document.getElementById('speed-val')!.innerText = val.toFixed(1) + 'x';
+            this.updateSpeedDisplay();
         });
 
         const spawnRateSlider = document.getElementById('spawn-rate') as HTMLInputElement;
@@ -176,7 +267,7 @@ export class UI {
             this.simulation.spawnRate = val;
             document.getElementById('spawn-rate-val')!.innerText = val.toFixed(1) + 'x';
         });
-        
+
         document.getElementById('car-accel')?.addEventListener('input', (e) => {
             const val = parseFloat((e.target as HTMLInputElement).value);
             this.simulation.carAcceleration = val;
@@ -186,7 +277,13 @@ export class UI {
         document.getElementById('car-decel')?.addEventListener('input', (e) => {
             const val = parseFloat((e.target as HTMLInputElement).value);
             this.simulation.carDeceleration = val;
-            document.getElementById('decel-val')!.innerText = val.toFixed(2);
+            document.getElementById('decel-val')!.innerText = val.toFixed(3);
+        });
+
+        document.getElementById('car-reaction')?.addEventListener('input', (e) => {
+            const val = parseInt((e.target as HTMLInputElement).value);
+            this.simulation.carReactionTime = val;
+            document.getElementById('reaction-val')!.innerText = val + ' ticks';
         });
 
         document.getElementById('rebel-chance')?.addEventListener('input', (e) => {
@@ -199,6 +296,10 @@ export class UI {
             this.simulation.rebelDebug = (e.target as HTMLInputElement).checked;
         });
 
+        document.getElementById('unstuck-timer-toggle')?.addEventListener('change', (e) => {
+            this.simulation.unstuckTimerEnabled = (e.target as HTMLInputElement).checked;
+        });
+
         document.getElementById('crash-penalty')?.addEventListener('change', (e) => {
             this.simulation.crashPenalty = parseInt((e.target as HTMLInputElement).value);
         });
@@ -206,26 +307,17 @@ export class UI {
         document.getElementById('crash-timeout')?.addEventListener('change', (e) => {
             this.simulation.collisionCleanupTimeout = parseInt((e.target as HTMLInputElement).value);
         });
-        
+
         document.getElementById('gameover-timeout')?.addEventListener('change', (e) => {
             this.simulation.gameOverTimeout = parseInt((e.target as HTMLInputElement).value);
         });
 
-        document.getElementById('pause-sim')?.addEventListener('click', () => {
-            if (this.simulation.timeScale === 0) {
-                const val = parseFloat(speedSlider.value);
-                this.simulation.timeScale = val;
-                document.getElementById('pause-sim')!.innerText = 'Pause';
-            } else {
-                this.simulation.timeScale = 0;
-                document.getElementById('pause-sim')!.innerText = 'Resume';
-            }
-        });
+        document.getElementById('pause-sim')?.addEventListener('click', () => this.togglePause());
 
         document.getElementById('debug-toggle')?.addEventListener('change', (e) => {
             document.getElementById('debug-panel')!.style.display = (e.target as HTMLInputElement).checked ? 'block' : 'none';
         });
-        
+
         document.getElementById('debug-draw')?.addEventListener('change', (e) => {
             if ((window as any).renderer) (window as any).renderer.debugMode = (e.target as HTMLInputElement).checked;
         });
@@ -273,65 +365,64 @@ export class UI {
     private resetControls() {
         (document.getElementById('sim-speed') as HTMLInputElement).value = "1.0";
         this.simulation.timeScale = 1.0;
-        document.getElementById('speed-val')!.innerText = "1.0x";
-        
+        this.updateSpeedDisplay();
+
         (document.getElementById('spawn-rate') as HTMLInputElement).value = "1.0";
         this.simulation.spawnRate = 1.0;
         document.getElementById('spawn-rate-val')!.innerText = "1.0x";
 
-        (document.getElementById('car-accel') as HTMLInputElement).value = "0.02";
-        this.simulation.carAcceleration = 0.02;
-        document.getElementById('accel-val')!.innerText = "0.020";
+        (document.getElementById('car-accel') as HTMLInputElement).value = "0.006";
+        this.simulation.carAcceleration = 0.006;
+        document.getElementById('accel-val')!.innerText = "0.006";
 
         (document.getElementById('car-decel') as HTMLInputElement).value = "0.05";
         this.simulation.carDeceleration = 0.05;
         document.getElementById('decel-val')!.innerText = "0.05";
 
-        (document.getElementById('rebel-chance') as HTMLInputElement).value = "0.5";
-        this.simulation.rebelChance = 0.005;
-        document.getElementById('rebel-val')!.innerText = "0.5%";
+        (document.getElementById('rebel-chance') as HTMLInputElement).value = "0";
+        this.simulation.rebelChance = 0;
+        document.getElementById('rebel-val')!.innerText = "0%";
 
         (document.getElementById('crash-penalty') as HTMLInputElement).value = "1000";
         this.simulation.crashPenalty = 1000;
 
-        (document.getElementById('crash-timeout') as HTMLInputElement).value = "1800";
-        this.simulation.collisionCleanupTimeout = 1800;
+        (document.getElementById('crash-timeout') as HTMLInputElement).value = "300";
+        this.simulation.collisionCleanupTimeout = 300;
 
-        (document.getElementById('gameover-timeout') as HTMLInputElement).value = "1200";
-        this.simulation.gameOverTimeout = 1200;
+        (document.getElementById('gameover-timeout') as HTMLInputElement).value = "3000";
+        this.simulation.gameOverTimeout = 3000;
+
+        document.getElementById('pause-sim')!.innerText = 'Pause';
     }
 
     private showStartScreen() {
         const startScreen = document.createElement('div');
         startScreen.id = 'start-screen';
-        startScreen.style.position = 'absolute';
-        startScreen.style.top = '0'; startScreen.style.left = '0';
-        startScreen.style.width = '100%'; startScreen.style.height = '100%';
-        startScreen.style.background = 'rgba(0,0,0,0.95)';
-        startScreen.style.display = 'flex'; startScreen.style.flexDirection = 'column';
-        startScreen.style.justifyContent = 'center'; startScreen.style.alignItems = 'center';
-        startScreen.style.zIndex = '1000'; startScreen.style.color = 'white';
-        startScreen.style.fontFamily = 'monospace';
+        startScreen.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;justify-content:center;align-items:center;z-index:1000;color:white;font-family:monospace;';
 
         startScreen.innerHTML = `
-            <h1 style="font-size: 3rem; color: #3498db; margin-bottom: 20px;">TRAFFIX</h1>
+            <h1 style="font-size: 4rem; color: #3498db; margin-bottom: 10px; text-shadow: 0 0 20px rgba(52,152,219,0.5);">TRAFFIX</h1>
+            <div style="color: #7f8c8d; margin-bottom: 20px;">${GAME_VERSION}</div>
             <div style="max-width: 600px; text-align: center; margin-bottom: 30px; line-height: 1.6;">
-                <p>Welcome to Traffix, the traffic optimization simulator.</p>
+                <p>Welcome to <strong>Traffix</strong>, the traffic optimization simulator.</p>
                 <p><strong>Goal:</strong> Manage traffic lights to ensure smooth flow. Cars exiting correctly give points.</p>
-                <p><strong>Rules:</strong></p>
-                <ul style="text-align: left; display: inline-block;">
-                    <li>Configure traffic light phases for each intersection.</li>
-                    <li>Avoid gridlock! If a car is stuck at a spawn point for too long, <strong>GAME OVER</strong>.</li>
-                    <li>Stuck cars elsewhere will eventually be removed with a score penalty.</li>
-                </ul>
+                <div style="text-align: left; background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; margin-top: 15px;">
+                    <div style="font-weight: bold; margin-bottom: 8px; color: #f1c40f;">Controls:</div>
+                    <div style="font-size: 0.9rem; color: #bdc3c7;">
+                        Space - Pause/Resume<br>
+                        Left/Right - Adjust speed<br>
+                        Click car - Track path<br>
+                        Click intersection - Configure lights
+                    </div>
+                </div>
             </div>
-            <h3 style="margin-bottom: 10px;">Select Level</h3>
-            <div style="display: flex; gap: 10px;">
-                <button class="level-btn" data-level="tutorial" style="padding: 10px 20px; font-size: 1.2rem; background: #e67e22; color: white; border: none; border-radius: 8px; cursor: pointer;">Tutorial</button>
-                <button class="level-btn" data-level="classic" style="padding: 10px 20px; font-size: 1.2rem; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer;">Classic</button>
-                <button class="level-btn" data-level="level1" style="padding: 10px 20px; font-size: 1.2rem; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer;">Level 1</button>
-                <button class="level-btn" data-level="level2" style="padding: 10px 20px; font-size: 1.2rem; background: #9b59b6; color: white; border: none; border-radius: 8px; cursor: pointer;">Level 2</button>
-                <button class="level-btn" data-level="random" style="padding: 10px 20px; font-size: 1.2rem; background: #c0392b; color: white; border: none; border-radius: 8px; cursor: pointer;">Random</button>
+            <h3 style="margin-bottom: 15px; color: #ecf0f1;">Select Level</h3>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+                <button class="level-btn" data-level="tutorial" style="padding: 12px 24px; font-size: 1.1rem; background: #e67e22; color: white; border: none; border-radius: 8px; cursor: pointer;">Tutorial</button>
+                <button class="level-btn" data-level="classic" style="padding: 12px 24px; font-size: 1.1rem; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer;">Classic</button>
+                <button class="level-btn" data-level="level1" style="padding: 12px 24px; font-size: 1.1rem; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer;">Level 1</button>
+                <button class="level-btn" data-level="level2" style="padding: 12px 24px; font-size: 1.1rem; background: #9b59b6; color: white; border: none; border-radius: 8px; cursor: pointer;">Level 2</button>
+                <button class="level-btn" data-level="random" style="padding: 12px 24px; font-size: 1.1rem; background: #c0392b; color: white; border: none; border-radius: 8px; cursor: pointer;">Random</button>
             </div>
         `;
         this.container.appendChild(startScreen);
@@ -345,7 +436,7 @@ export class UI {
                 this.renderIntersections();
                 startScreen.remove();
                 this.simulation.timeScale = 1.0;
-                (document.getElementById('sim-speed') as HTMLInputElement).value = "1.0";
+                this.updateSpeedDisplay();
             });
         });
     }
@@ -356,79 +447,107 @@ export class UI {
         return '#e74c3c';
     }
 
-    private handleIntersectionChange(e: Event) {
-        const target = e.target as any;
-        const intIdx = parseInt(target.getAttribute('data-int'));
-        const phaseIdx = parseInt(target.getAttribute('data-phase'));
-        const field = target.getAttribute('data-field');
-        const dir = target.getAttribute('data-dir');
-        const intersection = this.simulation.getState().intersections[intIdx];
-        const phase = intersection.phases[phaseIdx];
-        if (field === 'name') phase.name = target.value;
-        if (field === 'duration') phase.duration = parseInt(target.value);
-        if (dir) phase.lightStates[dir] = target.value;
-    }
-
     private renderIntersections() {
         if (!this.simulation) return;
-        const intersections = this.simulation.getState().intersections;
+        const intersections = this.simulation.getState().intersections as Intersection[];
         const list = document.getElementById('lights-list');
         if (!list) return;
         list.innerHTML = '';
+
         intersections.forEach((intersection, intIdx) => {
             const div = document.createElement('div');
             div.className = 'intersection-control';
-            div.style.marginBottom = '20px'; div.style.padding = '10px';
-            div.style.border = '1px solid #555'; div.style.background = 'rgba(255,255,255,0.05)';
-            div.style.borderRadius = '4px';
-            let phasesHtml = '';
+            div.style.cssText = 'margin-bottom:15px;padding:10px;border:1px solid #555;background:rgba(255,255,255,0.03);border-radius:6px;';
+
+            let headerHtml = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                    <strong style="color:#3498db;font-size:0.95rem;">${intersection.id}</strong>
+                    <div style="display:flex;gap:5px;align-items:center;">
+                        <select id="preset-${intIdx}" data-int="${intIdx}" class="preset-select" style="font-size:0.7rem;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:2px 5px;">
+                            <option value="opposite-phasing" ${intersection.currentPreset === 'opposite-phasing' ? 'selected' : ''}>Opposite</option>
+                            <option value="round-robin" ${intersection.currentPreset === 'round-robin' ? 'selected' : ''}>Round-Robin</option>
+                            <option value="all-way-stop" ${intersection.currentPreset === 'all-way-stop' ? 'selected' : ''}>All-Way Stop</option>
+                            <option value="manual" ${intersection.currentPreset === 'manual' ? 'selected' : ''}>Manual</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;font-size:0.7rem;">
+                    <div>
+                        <label style="color:#888;">Green:</label>
+                        <input type="number" class="timing-input" data-int="${intIdx}" data-timing="green" value="${intersection.presetConfig?.greenDuration || 180}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                    </div>
+                    <div>
+                        <label style="color:#888;">Yellow:</label>
+                        <input type="number" class="timing-input" data-int="${intIdx}" data-timing="yellow" value="${intersection.presetConfig?.yellowDuration || 30}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                    </div>
+                    <div>
+                        <label style="color:#888;">All-Red:</label>
+                        <input type="number" class="timing-input" data-int="${intIdx}" data-timing="allRed" value="${intersection.presetConfig?.allRedDuration || 30}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                    </div>
+                </div>
+            `;
+
+            let phasesHtml = '<div class="phases-container" style="max-height:200px;overflow-y:auto;">';
             intersection.phases.forEach((phase, phaseIdx) => {
                 const isCurrent = intersection.currentPhaseIndex === phaseIdx;
                 phasesHtml += `
-                    <div style="margin-top: 5px; padding: 5px; border: 1px solid ${isCurrent ? '#2ecc71' : '#444'}; background: ${isCurrent ? 'rgba(46, 204, 113, 0.1)' : 'transparent'}">
-                        <div style="display:flex; justify-content:space-between; font-size: 0.7rem; align-items: center;">
-                            <input type="text" value="${phase.name}" data-int="${intIdx}" data-phase="${phaseIdx}" data-field="name" style="width: 80px; background: transparent; color: white; border: none; border-bottom: 1px solid #444;">
-                            <div style="display: flex; align-items: center; gap: 2px;">
-                                <input type="number" value="${phase.duration}" data-int="${intIdx}" data-phase="${phaseIdx}" data-field="duration" style="width: 40px; background: #222; color: white; border: 1px solid #444; border-radius: 2px; padding: 1px;">
-                                <span style="font-size: 0.6rem; color: #aaa;">ticks</span>
-                            </div>
-                            <button class="del-phase" data-int="${intIdx}" data-phase="${phaseIdx}" style="background:none; border:none; color:#c0392b; cursor:pointer; font-weight:bold;">×</button>
+                    <div style="margin-top:4px;padding:5px;border:1px solid ${isCurrent ? '#2ecc71' : '#444'};background:${isCurrent ? 'rgba(46,204,113,0.1)' : 'transparent'};border-radius:3px;">
+                        <div style="display:flex;justify-content:space-between;font-size:0.7rem;align-items:center;">
+                            <span style="color:${isCurrent ? '#2ecc71' : '#888'};">${phase.name}</span>
+                            <span style="color:#666;">${phase.duration}t</span>
                         </div>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 4px; margin-top: 5px;">
-                            ${['n', 's', 'e', 'w'].map(dir => `
-                                <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-                                    <span style="font-size: 0.6rem; color: #888;">${dir.toUpperCase()}</span>
-                                    <select data-int="${intIdx}" data-phase="${phaseIdx}" data-dir="${dir}" style="font-size: 0.7rem; background: #333; color: ${this.getStateColor(phase.lightStates[dir])}; border: 1px solid #555; border-radius: 2px; width: 100%;">
-                                        <option value="RED" ${phase.lightStates[dir] === 'RED' ? 'selected' : ''}>RED</option>
-                                        <option value="YELLOW" ${phase.lightStates[dir] === 'YELLOW' ? 'selected' : ''}>YEL</option>
-                                        <option value="GREEN" ${phase.lightStates[dir] === 'GREEN' ? 'selected' : ''}>GRN</option>
-                                    </select>
+                        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:4px;">
+                            ${['n','s','e','w'].map(dir => `
+                                <div style="text-align:center;">
+                                    <div style="font-size:0.6rem;color:#666;">${dir.toUpperCase()}</div>
+                                    <div style="width:12px;height:12px;border-radius:50%;margin:0 auto;background:${this.getStateColor(phase.lightStates[dir])};"></div>
                                 </div>
                             `).join('')}
                         </div>
                     </div>
                 `;
             });
-            div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 8px;"><strong style="color: #3498db; font-size: 0.9rem;">${intersection.id}</strong><button class="add-phase" data-int="${intIdx}" style="padding: 2px 8px; font-size: 0.7rem; background: #27ae60; color: white; border: none; border-radius: 3px; cursor: pointer;">+ Add Phase</button></div><div class="phases-container">${phasesHtml}</div>`;
+            phasesHtml += '</div>';
+
+            div.innerHTML = headerHtml + phasesHtml;
             list.appendChild(div);
         });
-        list.querySelectorAll('input, select').forEach(el => el.addEventListener('change', (e) => this.handleIntersectionChange(e)));
-        list.querySelectorAll('.add-phase').forEach(btn => btn.addEventListener('click', (e) => {
-            const intIdx = parseInt((e.target as HTMLElement).getAttribute('data-int')!);
-            this.simulation.getState().intersections[intIdx].phases.push({ id: 'p' + Date.now(), name: 'New Phase', duration: 60, lightStates: { 'n': 'RED', 's': 'RED', 'e': 'RED', 'w': 'RED' } });
-            this.renderIntersections();
-        }));
-        list.querySelectorAll('.del-phase').forEach(btn => btn.addEventListener('click', (e) => {
-            const btnEl = (e.target as HTMLElement).closest('.del-phase') as HTMLElement;
-            const intIdx = parseInt(btnEl.getAttribute('data-int')!);
-            const phaseIdx = parseInt(btnEl.getAttribute('data-phase')!);
-            this.simulation.getState().intersections[intIdx].phases.splice(phaseIdx, 1);
-            this.renderIntersections();
-        }));
+
+        list.querySelectorAll('.preset-select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const intIdx = parseInt((e.target as HTMLSelectElement).getAttribute('data-int')!);
+                const preset = (e.target as HTMLSelectElement).value as TrafficLightPreset;
+                const intersection = this.simulation.getState().intersections[intIdx] as Intersection;
+                intersection.applyPreset(preset);
+                this.renderIntersections();
+            });
+        });
+
+        list.querySelectorAll('.timing-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const intIdx = parseInt((e.target as HTMLInputElement).getAttribute('data-int')!);
+                const timing = (e.target as HTMLInputElement).getAttribute('data-timing')!;
+                const value = parseInt((e.target as HTMLInputElement).value);
+                const intersection = this.simulation.getState().intersections[intIdx] as Intersection;
+
+                if (timing === 'green') intersection.presetConfig.greenDuration = value;
+                if (timing === 'yellow') intersection.presetConfig.yellowDuration = value;
+                if (timing === 'allRed') intersection.presetConfig.allRedDuration = value;
+
+                if (intersection.currentPreset !== 'manual') {
+                    intersection.applyPreset(intersection.currentPreset);
+                    this.renderIntersections();
+                }
+            });
+        });
     }
 
     public update(state: SimulationState) {
-        if (state.gameOver) { this.showGameOver(state.gameOverReason || "Game Over", state.score); return; }
+        if (state.gameOver) {
+            this.showGameOver(state.gameOverReason || "Game Over", state.score);
+            return;
+        }
+
         const warningEl = document.getElementById('spawn-stuck-warning');
         const countdownEl = document.getElementById('countdown-timer');
         if (warningEl) {
@@ -436,29 +555,51 @@ export class UI {
             warningEl.style.display = isWarning ? 'block' : 'none';
             if (isWarning) {
                 const speedSlider = document.getElementById('sim-speed') as HTMLInputElement;
-                if (speedSlider && speedSlider.value !== "1.0") {
+                if (speedSlider && this.simulation.timeScale > 1.0) {
+                    this.simulation.timeScale = 1.0;
                     speedSlider.value = "1.0";
-                    document.getElementById('speed-val')!.innerText = "1.0x";
+                    this.updateSpeedDisplay();
                 }
-
-                // Calculate countdown: 1200 ticks is game over. Warning starts at 600.
                 const maxStuck = Math.max(0, ...state.vehicles.map(v => v.spawnStuckTimer || 0));
-                const remaining = Math.ceil((1200 - maxStuck) / 60);
+                const remaining = Math.ceil((this.simulation.gameOverTimeout - maxStuck) / 60);
                 if (countdownEl) {
                     countdownEl.innerText = remaining > 0 ? remaining.toString() : "!";
                 }
             }
         }
+
         this.updateScore(state.score, state.exitedCars, state.currentSpawnRate);
+
+        const vehicleCountEl = document.getElementById('vehicle-count');
+        if (vehicleCountEl) vehicleCountEl.innerText = state.vehicles.length.toString();
+
         const selInfo = document.getElementById('selection-info');
         if (selInfo) {
             const selId = this.simulation.selectedVehicleId;
             const vehicle = state.vehicles.find((v: any) => v.id === selId);
             if (vehicle) {
-                const isStuck = vehicle.stuckTimer > 1200;
-                selInfo.innerHTML = `<div style="margin-bottom: 5px;"><strong>Vehicle: ${vehicle.id}</strong> <button id="del-veh" data-id="${vehicle.id}" style="padding: 2px 5px; font-size: 0.7rem; background: #c0392b; color: white; border: none; border-radius: 3px; cursor: pointer;">Delete</button></div>Pos: (${vehicle.position.x.toFixed(1)}, ${vehicle.position.y.toFixed(1)})<br/>Vel: ${vehicle.velocity.toFixed(3)}<br/>State: <span style="color: ${isStuck ? '#e74c3c' : '#e67e22'}">${vehicle.debugState}</span><br/>Stuck: ${vehicle.stuckTimer} / Spawn: ${vehicle.spawnStuckTimer}<br/>Rebel: ${vehicle.violatesRules ? 'YES' : 'NO'}`;
-            } else { selInfo.innerText = 'Click a car to track path'; this.simulation.selectedVehicleId = null; }
+                const isStuck = vehicle.stuckTimer > 600;
+                const pathInfo = vehicle.path ? `Path: ${vehicle.currentTargetIndex}/${vehicle.path.length}` : 'No path';
+                const destInfo = vehicle.destination ? ` -> (${vehicle.destination.x}, ${vehicle.destination.y})` : '';
+
+                selInfo.innerHTML = `
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                        <strong style="color:#3498db;">${vehicle.id.substring(0,15)}...</strong>
+                        <button id="del-veh" data-id="${vehicle.id}" style="padding:2px 8px;font-size:0.7rem;background:#c0392b;color:white;border:none;border-radius:3px;cursor:pointer;">X Delete</button>
+                    </div>
+                    <div style="font-size:0.8rem;">
+                        <div>Pos: (${vehicle.position.x.toFixed(1)}, ${vehicle.position.y.toFixed(1)})${destInfo}</div>
+                        <div>Vel: ${vehicle.velocity.toFixed(3)} | State: <span style="color:${isStuck ? '#e74c3c' : '#f1c40f'}">${vehicle.debugState}</span></div>
+                        <div>${pathInfo} | Stuck: ${vehicle.stuckTimer}</div>
+                        <div>Rebel: ${vehicle.violatesRules ? 'YES' : 'No'}</div>
+                    </div>
+                `;
+            } else {
+                selInfo.innerHTML = '<div style="color:#888;font-size:0.85rem;">Click a car to track its path</div>';
+                this.simulation.selectedVehicleId = null;
+            }
         }
+
         const list = document.getElementById('lights-list');
         if (list) {
              const intersectionControls = list.querySelectorAll('.intersection-control');
@@ -466,12 +607,10 @@ export class UI {
                  const ctrl = intersectionControls[i];
                  if (ctrl) {
                      const phaseContainers = ctrl.querySelectorAll('.phases-container > div');
-                     phaseContainers.forEach((pDiv: any, pIdx) => {
+                     phaseContainers.forEach((pDiv: any, pIdx: number) => {
                          const isCurrent = intersection.currentPhaseIndex === pIdx;
                          pDiv.style.border = `1px solid ${isCurrent ? '#2ecc71' : '#444'}`;
-                         pDiv.style.background = isCurrent ? 'rgba(46, 204, 113, 0.1)' : 'transparent';
-                         const selects = pDiv.querySelectorAll('select');
-                         selects.forEach((sel: HTMLSelectElement) => sel.style.color = this.getStateColor(sel.value));
+                         pDiv.style.background = isCurrent ? 'rgba(46,204,113,0.1)' : 'transparent';
                      });
                  }
              });
@@ -488,30 +627,119 @@ export class UI {
 
     public showGameOver(reason: string, score: number) {
         if (document.getElementById('game-over-screen')) return;
+
         const screen = document.createElement('div');
         screen.id = 'game-over-screen';
-        screen.style.position = 'absolute';
-        screen.style.top = '0'; screen.style.left = '0';
-        screen.style.width = '100%'; screen.style.height = '100%';
-        screen.style.background = 'rgba(192, 57, 43, 0.9)';
-        screen.style.display = 'flex'; screen.style.flexDirection = 'column';
-        screen.style.justifyContent = 'center'; screen.style.alignItems = 'center';
-        screen.style.zIndex = '1000'; screen.style.color = 'white';
-        screen.style.fontFamily = 'monospace';
-        screen.innerHTML = `<h1 style="font-size: 4rem; margin-bottom: 10px;">GAME OVER</h1><p style="font-size: 1.5rem; margin-bottom: 20px;">${reason}</p><h2 style="font-size: 2rem; margin-bottom: 30px;">Final Score: ${score}</h2><button id="restart-btn" style="padding: 15px 40px; font-size: 1.5rem; background: #ecf0f1; color: #2c3e50; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">TRY AGAIN</button>`;
-        this.container.appendChild(screen);
+        screen.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(192,57,43,0.95);color:white;padding:40px 60px;border-radius:16px;text-align:center;z-index:10000;font-family:monospace;box-shadow:0 0 50px rgba(0,0,0,0.8);';
+
+        screen.innerHTML = `
+            <h1 style="font-size:3rem;margin-bottom:15px;">GAME OVER</h1>
+            <p style="font-size:1.2rem;margin-bottom:20px;color:#f5b7b1;">${reason}</p>
+            <h2 style="font-size:2rem;margin-bottom:25px;">Final Score: <span style="color:#f1c40f;">${score}</span></h2>
+            <div style="font-size:0.9rem;margin-bottom:20px;color:#fadbd8;">
+                Total Crashes: ${this.simulation.getTotalCrashes()}
+            </div>
+            <button id="restart-btn" style="padding:15px 40px;font-size:1.3rem;background:#ecf0f1;color:#2c3e50;border:none;border-radius:8px;cursor:pointer;font-weight:bold;">TRY AGAIN</button>
+        `;
+
+        document.body.appendChild(screen);
+
         document.getElementById('restart-btn')?.addEventListener('click', () => {
-            screen.remove(); this.simulation.reset();
+            screen.remove();
+            this.simulation.reset();
             if ((window as any).renderer) (window as any).renderer.clearCache();
-            this.renderIntersections(); this.updateScore(0, 0, 0); this.simulation.timeScale = 1.0;
+            this.renderIntersections();
+            this.updateScore(0, 0, 0);
+            this.resetControls();
         });
     }
 
     public log(msg: string) {
         if (this.logEl) {
-            const div = document.createElement('div'); div.innerText = `> ${msg}`;
+            const div = document.createElement('div');
+            div.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+            div.style.padding = '2px 0';
+            div.innerText = `> ${msg}`;
             this.logEl.insertBefore(div, this.logEl.firstChild);
             if (this.logEl.childNodes.length > 50) this.logEl.removeChild(this.logEl.lastChild!);
+        }
+    }
+
+    public showIntersectionPopup(intersectionId: string, screenX: number, screenY: number) {
+        this.closeIntersectionPopup();
+
+        const intersections = this.simulation.getState().intersections as Intersection[];
+        const intersection = intersections.find(i => i.id === intersectionId);
+        if (!intersection) return;
+
+        const popup = document.createElement('div');
+        popup.id = 'intersection-popup';
+        popup.style.cssText = `position:fixed;left:${screenX}px;top:${screenY}px;background:rgba(0,0,0,0.95);color:white;padding:15px;border-radius:8px;font-family:monospace;z-index:10000;min-width:250px;box-shadow:0 0 20px rgba(0,0,0,0.5);border:1px solid #3498db;`;
+
+        popup.innerHTML = `
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <strong style="color:#3498db;">${intersection.id}</strong>
+                <button id="close-popup" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2rem;">X</button>
+            </div>
+            <div style="margin-bottom:10px;">
+                <label style="font-size:0.8rem;color:#888;">Preset:</label>
+                <select id="popup-preset" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:4px;padding:5px;">
+                    <option value="opposite-phasing" ${intersection.currentPreset === 'opposite-phasing' ? 'selected' : ''}>Opposite (N-S / E-W)</option>
+                    <option value="round-robin" ${intersection.currentPreset === 'round-robin' ? 'selected' : ''}>Round-Robin</option>
+                    <option value="all-way-stop" ${intersection.currentPreset === 'all-way-stop' ? 'selected' : ''}>All-Way Stop</option>
+                    <option value="manual" ${intersection.currentPreset === 'manual' ? 'selected' : ''}>Manual</option>
+                </select>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+                <div>
+                    <label style="font-size:0.7rem;color:#888;">Green</label>
+                    <input type="number" id="popup-green" value="${intersection.presetConfig.greenDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:3px;">
+                </div>
+                <div>
+                    <label style="font-size:0.7rem;color:#888;">Yellow</label>
+                    <input type="number" id="popup-yellow" value="${intersection.presetConfig.yellowDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:3px;">
+                </div>
+                <div>
+                    <label style="font-size:0.7rem;color:#888;">All-Red</label>
+                    <input type="number" id="popup-allred" value="${intersection.presetConfig.allRedDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:3px;">
+                </div>
+            </div>
+            <button id="apply-popup" style="width:100%;padding:8px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;">Apply Changes</button>
+        `;
+
+        document.body.appendChild(popup);
+        this.intersectionPopup = popup;
+
+        popup.querySelector('#close-popup')?.addEventListener('click', () => this.closeIntersectionPopup());
+
+        popup.querySelector('#apply-popup')?.addEventListener('click', () => {
+            const preset = (popup.querySelector('#popup-preset') as HTMLSelectElement).value as TrafficLightPreset;
+            const green = parseInt((popup.querySelector('#popup-green') as HTMLInputElement).value);
+            const yellow = parseInt((popup.querySelector('#popup-yellow') as HTMLInputElement).value);
+            const allRed = parseInt((popup.querySelector('#popup-allred') as HTMLInputElement).value);
+
+            intersection.presetConfig = { greenDuration: green, yellowDuration: yellow, allRedDuration: allRed };
+            intersection.applyPreset(preset);
+            this.renderIntersections();
+            this.closeIntersectionPopup();
+        });
+
+        setTimeout(() => {
+            document.addEventListener('click', this.handlePopupOutsideClick);
+        }, 100);
+    }
+
+    private handlePopupOutsideClick = (e: MouseEvent) => {
+        if (this.intersectionPopup && !this.intersectionPopup.contains(e.target as Node)) {
+            this.closeIntersectionPopup();
+        }
+    };
+
+    public closeIntersectionPopup() {
+        if (this.intersectionPopup) {
+            this.intersectionPopup.remove();
+            this.intersectionPopup = null;
+            document.removeEventListener('click', this.handlePopupOutsideClick);
         }
     }
 }

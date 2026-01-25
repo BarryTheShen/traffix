@@ -8,10 +8,12 @@ export class Renderer {
     private gridContainer: PIXI.Container;
     private gridGraphics: PIXI.Graphics;
     private entityGraphics: PIXI.Graphics;
+    private pathGraphics: PIXI.Graphics;
     private labelContainer: PIXI.Container;
     private gridRendered: boolean = false;
     private container: HTMLElement;
     public debugMode: boolean = true;
+    private intersectionBounds: Map<string, {x: number, y: number, width: number, height: number}> = new Map();
 
     constructor(container: HTMLElement) {
         this.container = container;
@@ -19,6 +21,7 @@ export class Renderer {
         this.gridContainer = new PIXI.Container();
         this.gridGraphics = new PIXI.Graphics();
         this.entityGraphics = new PIXI.Graphics();
+        this.pathGraphics = new PIXI.Graphics();
         this.labelContainer = new PIXI.Container();
     }
 
@@ -26,6 +29,7 @@ export class Renderer {
         await this.app.init({ background: '#1a1a1a', resizeTo: this.container, antialias: true });
         this.container.appendChild(this.app.canvas);
         this.gridContainer.addChild(this.gridGraphics);
+        this.gridContainer.addChild(this.pathGraphics);
         this.gridContainer.addChild(this.entityGraphics);
         this.gridContainer.addChild(this.labelContainer);
         this.app.stage.addChild(this.gridContainer);
@@ -70,14 +74,45 @@ export class Renderer {
 
     private renderStaticGrid(state: SimulationState) {
         this.gridGraphics.clear();
+        this.intersectionBounds.clear();
+
+        // First pass: find intersection cell groups
+        const intersectionCells: Map<string, {minX: number, minY: number, maxX: number, maxY: number}> = new Map();
+        state.grid.forEach((row, y) => {
+            row.forEach((cell, x) => {
+                if (cell.type === 'intersection' && cell.intersectionId) {
+                    const id = cell.intersectionId;
+                    if (!intersectionCells.has(id)) {
+                        intersectionCells.set(id, {minX: x, minY: y, maxX: x, maxY: y});
+                    } else {
+                        const bounds = intersectionCells.get(id)!;
+                        bounds.minX = Math.min(bounds.minX, x);
+                        bounds.minY = Math.min(bounds.minY, y);
+                        bounds.maxX = Math.max(bounds.maxX, x);
+                        bounds.maxY = Math.max(bounds.maxY, y);
+                    }
+                }
+            });
+        });
+
+        // Store intersection bounds for click detection
+        intersectionCells.forEach((bounds, id) => {
+            this.intersectionBounds.set(id, {
+                x: bounds.minX * this.cellSize,
+                y: bounds.minY * this.cellSize,
+                width: (bounds.maxX - bounds.minX + 1) * this.cellSize,
+                height: (bounds.maxY - bounds.minY + 1) * this.cellSize
+            });
+        });
+
         state.grid.forEach((row, y) => {
             row.forEach((cell, x) => {
                 if (cell.type === 'empty') return;
-                
+
                 this.gridGraphics.beginPath()
                     .rect(x * this.cellSize, y * this.cellSize, this.cellSize, this.cellSize)
                     .fill(this.getColorForCell(cell));
-                
+
                 if (cell.type === 'road') {
                     const dir = cell.allowedDirections[0];
                     let dotColor = 0x555555;
@@ -85,7 +120,7 @@ export class Renderer {
                     if (dir === 'SOUTH') dotColor = 0xe74c3c;
                     if (dir === 'EAST') dotColor = 0xf1c40f;
                     if (dir === 'WEST') dotColor = 0x9b59b6;
-                    
+
                     this.gridGraphics.beginPath()
                         .rect(x * this.cellSize + 8, y * this.cellSize + 8, 4, 4)
                         .fill(dotColor);
@@ -99,19 +134,23 @@ export class Renderer {
     public render(state: SimulationState) {
         if (!this.gridRendered) this.renderStaticGrid(state);
         this.entityGraphics.clear();
+        this.pathGraphics.clear();
         this.labelContainer.removeChildren();
+
+        // Draw path for selected vehicle (works even when paused)
+        this.renderSelectedPath(state);
 
         // Traffic Lights
         state.trafficLights.forEach(light => {
             this.entityGraphics.beginPath()
                 .roundRect(light.position.x * this.cellSize + 4, light.position.y * this.cellSize + 2, this.cellSize - 8, this.cellSize - 4, 4)
                 .fill(0x333333);
-            
+
             let color = 0x1a1a1a;
             if (light.state === 'GREEN') color = 0x2ecc71;
             else if (light.state === 'YELLOW') color = 0xf1c40f;
             else if (light.state === 'RED') color = 0xe74c3c;
-            
+
             this.entityGraphics.beginPath()
                 .circle(light.position.x * this.cellSize + this.cellSize / 2, light.position.y * this.cellSize + this.cellSize / 2, this.cellSize / 4)
                 .fill(color);
@@ -123,7 +162,7 @@ export class Renderer {
             if (cell.type === 'entry') {
                 const key = `${x},${y}`;
                 const queue = state.laneQueues[key] || 0;
-                
+
                 // Red flash if blocked
                 if (state.blockedSpawnIds.includes(key) && flash) {
                     this.entityGraphics.beginPath()
@@ -147,9 +186,9 @@ export class Renderer {
         // Vehicles
         state.vehicles.forEach(vehicle => {
             const car = vehicle as Car;
-            const isSelected = car.id === (state as any).selectedVehicleId;
+            const isSelected = car.id === state.selectedVehicleId;
             let color = 0xf1c40f;
-            
+
             if (car.isCollided) color = 0x8e44ad;
             else if (isSelected) color = 0x3498db;
             else if (state.rebelDebug && car.violatesRules) color = 0xff00ff; // MAGENTA
@@ -166,7 +205,7 @@ export class Renderer {
                     .moveTo(vehicle.position.x * this.cellSize + 16, vehicle.position.y * this.cellSize + 4)
                     .lineTo(vehicle.position.x * this.cellSize + 4, vehicle.position.y * this.cellSize + 16)
                     .stroke({ width: 2, color: 0xffffff });
-                
+
                 // Use 300 ticks (5 seconds at 60fps) to match collisionCleanupTimeout
                 const timerSeconds = Math.ceil((300 - car.collisionTimer) / 60);
                 if (timerSeconds >= 0) {
@@ -191,5 +230,86 @@ export class Renderer {
         return found ? found.id : null;
     }
 
-    public clearCache() { this.gridRendered = false; }
+    /**
+     * Check if a click is on an intersection and return its ID
+     */
+    public getIntersectionAt(x: number, y: number): string | null {
+        const worldX = (x - this.gridContainer.x) / this.gridContainer.scale.x;
+        const worldY = (y - this.gridContainer.y) / this.gridContainer.scale.y;
+
+        for (const [id, bounds] of this.intersectionBounds) {
+            if (worldX >= bounds.x && worldX <= bounds.x + bounds.width &&
+                worldY >= bounds.y && worldY <= bounds.y + bounds.height) {
+                return id;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Render the path of the selected vehicle
+     */
+    private renderSelectedPath(state: SimulationState) {
+        const selectedId = state.selectedVehicleId;
+        if (!selectedId) return;
+
+        const vehicle = state.vehicles.find(v => v.id === selectedId) as Car;
+        if (!vehicle || !vehicle.path || vehicle.path.length === 0) return;
+
+        const path = vehicle.path;
+        const currentIdx = vehicle.currentTargetIndex || 0;
+
+        // Draw full path as semi-transparent line
+        this.pathGraphics.beginPath();
+        this.pathGraphics.moveTo(
+            vehicle.position.x * this.cellSize + this.cellSize / 2,
+            vehicle.position.y * this.cellSize + this.cellSize / 2
+        );
+
+        for (let i = currentIdx; i < path.length; i++) {
+            this.pathGraphics.lineTo(
+                path[i].x * this.cellSize + this.cellSize / 2,
+                path[i].y * this.cellSize + this.cellSize / 2
+            );
+        }
+        this.pathGraphics.stroke({ width: 3, color: 0x3498db, alpha: 0.6 });
+
+        // Draw waypoint markers
+        for (let i = currentIdx; i < path.length; i++) {
+            const isTarget = i === currentIdx;
+            const isDestination = i === path.length - 1;
+
+            let markerColor = 0x3498db;
+            let markerSize = 3;
+
+            if (isDestination) {
+                markerColor = 0x2ecc71;
+                markerSize = 6;
+            } else if (isTarget) {
+                markerColor = 0xf1c40f;
+                markerSize = 5;
+            }
+
+            this.pathGraphics.beginPath()
+                .circle(
+                    path[i].x * this.cellSize + this.cellSize / 2,
+                    path[i].y * this.cellSize + this.cellSize / 2,
+                    markerSize
+                )
+                .fill(markerColor);
+        }
+
+        // Draw destination marker with special styling
+        if (vehicle.destination) {
+            this.pathGraphics.beginPath()
+                .circle(
+                    vehicle.destination.x * this.cellSize + this.cellSize / 2,
+                    vehicle.destination.y * this.cellSize + this.cellSize / 2,
+                    8
+                )
+                .stroke({ width: 2, color: 0x2ecc71 });
+        }
+    }
+
+    public clearCache() { this.gridRendered = false; this.intersectionBounds.clear(); }
 }

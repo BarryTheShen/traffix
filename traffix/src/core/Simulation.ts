@@ -1,10 +1,13 @@
-import type { SimulationState, GridCell, Direction } from './types';
+import type { SimulationState, Vector2D } from './types';
 import { MapGenerator } from './MapGenerator';
 import { Car } from '../entities/Car';
 import { TrafficLight } from '../entities/TrafficLight';
 import { Pathfinding } from './Pathfinding';
 import { TrafficLightController } from './TrafficLightController';
 import { Intersection } from './Intersection';
+
+// Version constant
+export const GAME_VERSION = 'v0.2.0.1';
 
 export class Simulation {
     private state: SimulationState;
@@ -17,30 +20,36 @@ export class Simulation {
     private lightController: TrafficLightController;
 
     // Game Balance Config
-    public stuckCleanupTimeout: number = 2700; // Triple the time before stuck cars are removed
-    public collisionCleanupTimeout: number = 300; // Remove crashed cars faster (5 seconds) 
-    public gameOverTimeout: number = 3000; // Game over after 50 seconds of blocked spawn (after stuck cleanup)
+    public stuckCleanupTimeout: number = 2700;
+    public collisionCleanupTimeout: number = 300;
+    public gameOverTimeout: number = 3000;
     public crashPenalty: number = 1000;
     public currentLevel: string = 'level1';
     public baseSpawnRate: number = 1.0;
     public spawnRate: number = 1.0;
     public spawnEnabled: boolean = true;
-    
+
     // Internal State
     private totalCrashes: number = 0;
     private spawnAccumulator: number = 0;
     private lastSpawnTick: Map<string, number> = new Map();
     private countedCrashIds: Set<string> = new Set();
-    
+    public totalSpawned: number = 0;
+
     private internalLaneQueues: { [key: string]: number } = {};
     private blockedSpawnIds: Set<string> = new Set();
 
-    // Car Config
-    public carAcceleration: number = 0.006;
-    public carDeceleration: number = 0.05;
-    public rebelChance: number = 0.05; 
+    // Cached exit data for homogeneous exits
+    private exitsByRoad: Map<string, Vector2D[]> = new Map();
+
+    // Car Config (synced to carConfig global)
+    public carAcceleration: number = 0.008;
+    public carDeceleration: number = 0.025;
+    public carReactionTime: number = 20;
+    public rebelChance: number = 0.0; // Default 0% for benchmark
     public rebelDebug: boolean = false;
     public collisionRecovery: boolean = true;
+    public unstuckTimerEnabled: boolean = false; // Disabled by default for benchmark
 
     public onTick?: (state: SimulationState) => void;
     public logger?: (msg: string) => void;
@@ -51,11 +60,18 @@ export class Simulation {
         this.totalCrashes = 0;
         this.state = this.createInitialState();
         this.lightController = new TrafficLightController(this.state.intersections as any);
+        this.cacheExitData();
+    }
+
+    private cacheExitData() {
+        // Build exit cache for homogeneous exit selection
+        this.exitsByRoad = Pathfinding.findExitsByRoad(this.state.grid);
     }
 
     public reset(keepRules: boolean = true) {
         this.stop();
         this.totalCrashes = 0;
+        this.totalSpawned = 0;
         this.spawnAccumulator = 0;
         this.lastSpawnTick.clear();
         this.countedCrashIds.clear();
@@ -63,6 +79,7 @@ export class Simulation {
         this.blockedSpawnIds.clear();
         const oldIntersections = this.state.intersections;
         this.state = this.createInitialState();
+        this.cacheExitData();
         if (keepRules && oldIntersections) {
              this.state.intersections.forEach(newInt => {
                  const oldInt = oldIntersections.find(old => old.id === newInt.id);
@@ -150,15 +167,15 @@ export class Simulation {
             // GROWTH RATE FIX: 0.02 car/s^2 -> tick / 3000
             const growth = (this.state.tick / 3000);
             const baseTargetRate = (this.baseSpawnRate * this.spawnRate) + growth;
-            
+
             // Adaptive spawn rate: reduce when queues are building up
             const totalQueued = Object.values(this.internalLaneQueues).reduce((a, b) => a + b, 0);
             const blockedFraction = this.blockedSpawnIds.size > 0 ? this.blockedSpawnIds.size / Math.max(1, Object.keys(this.internalLaneQueues).length) : 0;
             const queuePenalty = Math.min(1.0, totalQueued * 0.1 + blockedFraction * 0.5);
             const targetRate = Math.max(0.1, baseTargetRate * (1.0 - queuePenalty));
-            
+
             (this.state as any).currentSpawnRate = Math.min(targetRate, 50.0);
-            
+
             if (this.spawnEnabled) {
                 this.spawnAccumulator += targetRate / 60;
                 while (this.spawnAccumulator >= 1) {
@@ -170,7 +187,7 @@ export class Simulation {
 
             this.lightController.update();
             this.updateVehicles(finalScale);
-            
+
             // Map internal queue keys back to grid cells for UI
             this.state.laneQueues = {};
             const blockedIds: string[] = [];
@@ -184,7 +201,7 @@ export class Simulation {
                 }
             }));
             this.state.blockedSpawnIds = blockedIds;
-            
+
             if (this.state.spawnStuckWarning && this.timeScale > 1.0) {
                 this.timeScale = 1.0;
             }
@@ -196,7 +213,7 @@ export class Simulation {
     private enqueueSpawn() {
         const entries: { x: number, y: number, key: string }[] = [];
         this.state.grid.forEach((row, y) => {
-            row.forEach((cell, x) => { 
+            row.forEach((cell, x) => {
                 if (cell.type === 'entry') {
                     // Use roadId if available, otherwise use coordinate-based key
                     const key = cell.roadId || `entry_${x}_${y}`;
@@ -205,7 +222,7 @@ export class Simulation {
             });
         });
         if (entries.length === 0) return;
-        
+
         // Get unique queue keys and pick one randomly
         const uniqueKeys = Array.from(new Set(entries.map(e => e.key)));
         const targetKey = uniqueKeys[Math.floor(Math.random() * uniqueKeys.length)];
@@ -217,7 +234,7 @@ export class Simulation {
         for (const queueKey in this.internalLaneQueues) {
             const count = this.internalLaneQueues[queueKey];
             if (count <= 0) continue;
-            
+
             const laneCells: {x: number, y: number}[] = [];
             this.state.grid.forEach((row, y) => {
                 row.forEach((cell, x) => {
@@ -283,46 +300,86 @@ export class Simulation {
     }
 
     private trySpawnAt(x: number, y: number): boolean {
-        // High-precision collision zone check (1.1 units center-to-center)
+        // Enhanced collision zone check - ensure no overlap with existing vehicles
+        const SPAWN_CLEARANCE = 1.5; // Minimum center-to-center distance for spawning
         for (const v of this.state.vehicles) {
             const dx = Math.abs(v.position.x - x);
             const dy = Math.abs(v.position.y - y);
-            if (dx < 0.5 && dy < 1.1) return false; 
-            if (dy < 0.5 && dx < 1.1) return false; 
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < SPAWN_CLEARANCE) return false;
         }
-        
-        const exitRoads = new Map<string, {x: number, y: number}[]>();
-        this.state.grid.forEach((row, gy) => {
-            row.forEach((cell, gx) => { 
-                if (cell.type === 'exit' && cell.roadId) {
-                    if (!exitRoads.has(cell.roadId)) exitRoads.set(cell.roadId, []);
-                    exitRoads.get(cell.roadId)!.push({x: gx, y: gy});
-                }
-            });
-        });
 
-        const roadIds = Array.from(exitRoads.keys());
-        if (roadIds.length > 0) {
-            const targetRoadId = roadIds[Math.floor(Math.random() * roadIds.length)];
-            const targetLanes = exitRoads.get(targetRoadId)!;
-            
-            // Prefer exit in SAME LANE alignment to minimize crossing
-            targetLanes.sort((a, b) => {
-                const distA = Math.min(Math.abs(a.x - x), Math.abs(a.y - y));
-                const distB = Math.min(Math.abs(b.x - x), Math.abs(b.y - y));
-                return distA - distB;
-            });
+        // Get the entry cell to determine which exits are valid based on lane type
+        const entryCell = this.state.grid[y]?.[x];
+        if (!entryCell) return false;
 
-            const exitCell = targetLanes[0];
-            const path = Pathfinding.findPath(this.state.grid, { x, y }, { x: exitCell.x, y: exitCell.y }, false);
-            if (path) {
-                const car = new Car(`car_${this.state.tick}_${Math.random().toString(36).substr(2, 5)}`, { x, y });
-                car.path = path; car.destination = { x: exitCell.x, y: exitCell.y };
-                this.state.vehicles.push(car); return true;
+        // Use cached exits grouped by road for homogeneous exit selection
+        const roadIds = Array.from(this.exitsByRoad.keys());
+        if (roadIds.length === 0) return false;
+
+        // Filter to roads that DON'T contain this entry (can't exit where you entered)
+        const entryRoadId = entryCell.roadId;
+        const validRoadIds = roadIds.filter(rid => rid !== entryRoadId);
+        if (validRoadIds.length === 0) return false;
+
+        // Pick a random destination road
+        const targetRoadId = validRoadIds[Math.floor(Math.random() * validRoadIds.length)];
+        const targetExits = this.exitsByRoad.get(targetRoadId)!;
+
+        // Try each exit lane on the target road (homogeneous - any lane works)
+        // Shuffle to avoid always picking the same one
+        const shuffledExits = [...targetExits].sort(() => Math.random() - 0.5);
+
+        for (const exitCell of shuffledExits) {
+            // Determine if car should be a rebel
+            const isRebel = Math.random() < this.rebelChance;
+
+            // Find path using appropriate lane preference
+            const path = Pathfinding.findPath(
+                this.state.grid,
+                { x, y },
+                { x: exitCell.x, y: exitCell.y },
+                isRebel,  // Rebels ignore lane rules
+                entryCell.laneType  // Prefer starting lane type
+            );
+
+            if (path && path.length > 1) {
+                const car = new Car(
+                    `car_${this.state.tick}_${Math.random().toString(36).substr(2, 5)}`,
+                    { x, y }
+                );
+                car.path = path;
+                car.destination = { x: exitCell.x, y: exitCell.y };
+                car.violatesRules = isRebel;
+                car.acceleration = this.carAcceleration;
+                car.deceleration = this.carDeceleration;
+                car.reactionTime = this.carReactionTime;
+                this.state.vehicles.push(car);
+                this.totalSpawned++;
+                return true;
             }
         }
+
         return false;
     }
 
-    public getState(): SimulationState { return this.state; }
+    public spawnVehicle() {
+        // Manual spawn - pick random entry and spawn
+        const entries: { x: number, y: number }[] = [];
+        this.state.grid.forEach((row, y) => {
+            row.forEach((cell, x) => {
+                if (cell.type === 'entry') entries.push({ x, y });
+            });
+        });
+        if (entries.length === 0) return;
+        const entry = entries[Math.floor(Math.random() * entries.length)];
+        this.trySpawnAt(entry.x, entry.y);
+    }
+
+    public getState(): SimulationState {
+        this.state.selectedVehicleId = this.selectedVehicleId;
+        return this.state;
+    }
+
+    public getTotalCrashes(): number { return this.totalCrashes; }
 }
