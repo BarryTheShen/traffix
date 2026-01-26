@@ -134,8 +134,18 @@ export class Pathfinding {
             return true;
         }
 
-        // Within intersection
+        // Within intersection - enforce logical path continuity
         if (currentCell.type === 'intersection' && targetCell.type === 'intersection') {
+            // Look up the entry direction to this intersection
+            const entryInfo = this.findIntersectionEntry(node, grid);
+            if (entryInfo && !ignoreLaneRules) {
+                // Can only continue in entry direction or valid turn direction
+                // NOT reverse direction (would be U-turn)
+                const reverseDir = this.getOppositeDirection(entryInfo.direction);
+                if (moveDir === reverseDir) {
+                    return false; // No U-turns within intersection
+                }
+            }
             return true;
         }
 
@@ -151,26 +161,38 @@ export class Pathfinding {
                 if (entryInfo) {
                     const turnType = this.getTurnType(entryInfo.direction, moveDir);
 
-                    // OUTER lane (left): LEFT or STRAIGHT only
-                    if (entryInfo.laneType === 'OUTER' && turnType === 'RIGHT') {
+                    // Determine effective lane position relative to travel direction
+                    // OUTER/INNER is assigned by absolute road position, but lane rules
+                    // depend on position relative to travel direction
+                    const effectiveLanePosition = this.getEffectiveLanePosition(
+                        entryInfo.direction, entryInfo.laneType
+                    );
+
+                    // LEFT side of travel: LEFT or STRAIGHT only
+                    if (effectiveLanePosition === 'LEFT' && turnType === 'RIGHT') {
                         return false;
                     }
-                    // INNER lane (right): RIGHT or STRAIGHT only
-                    if (entryInfo.laneType === 'INNER' && turnType === 'LEFT') {
+                    // RIGHT side of travel: RIGHT or STRAIGHT only
+                    if (effectiveLanePosition === 'RIGHT' && turnType === 'LEFT') {
                         return false;
                     }
 
                     // Must exit to correct lane after turn
                     if (targetCell.laneType) {
+                        // Get the effective position on the EXIT road
+                        const exitEffectivePosition = this.getEffectiveLanePosition(
+                            moveDir, targetCell.laneType
+                        );
+
                         if (turnType === 'STRAIGHT') {
-                            // Stay in same relative lane
-                            if (targetCell.laneType !== entryInfo.laneType) return false;
+                            // Stay in same relative lane position (LEFT stays LEFT, RIGHT stays RIGHT)
+                            if (exitEffectivePosition !== effectiveLanePosition) return false;
                         } else if (turnType === 'LEFT') {
-                            // Left turn exits to INNER lane (right side of new road)
-                            if (targetCell.laneType !== 'INNER') return false;
+                            // Left turn exits to RIGHT side of new road (from driver's perspective)
+                            if (exitEffectivePosition !== 'RIGHT') return false;
                         } else if (turnType === 'RIGHT') {
-                            // Right turn exits to OUTER lane (left side of new road)
-                            if (targetCell.laneType !== 'OUTER') return false;
+                            // Right turn exits to LEFT side of new road (from driver's perspective)
+                            if (exitEffectivePosition !== 'LEFT') return false;
                         }
                     }
                 }
@@ -208,6 +230,43 @@ export class Pathfinding {
             'WEST':  { 'SOUTH': 'LEFT', 'NORTH': 'RIGHT', 'EAST': 'UTURN', 'WEST': 'STRAIGHT' as any }
         };
         return turnMap[from][to] || 'STRAIGHT';
+    }
+
+    /**
+     * Determine the effective lane position (LEFT or RIGHT) relative to travel direction.
+     * OUTER/INNER is assigned by absolute road position, but lane rules depend on
+     * the driver's perspective (left side = can turn left, right side = can turn right).
+     *
+     * MapGenerator lane assignment (with lanes=2):
+     * - Vertical road at pos=20: x=18 SOUTH/OUTER, x=19 SOUTH/INNER, x=20 NORTH/INNER, x=21 NORTH/OUTER
+     * - Horizontal road at pos=10: y=8 WEST/OUTER, y=9 WEST/INNER, y=10 EAST/INNER, y=11 EAST/OUTER
+     *
+     * Driver's perspective (facing travel direction, right-hand traffic):
+     * - SOUTH (facing down): left=lower x. x=18 OUTER is leftmost → OUTER=LEFT
+     * - NORTH (facing up): left=higher x. x=21 OUTER is leftmost (from driver view) → OUTER=LEFT
+     * - EAST (facing right): left=lower y. y=10 INNER is at lower y → INNER=LEFT, OUTER=RIGHT
+     * - WEST (facing left): left=higher y. y=8 OUTER is at lower y → OUTER=RIGHT, INNER=LEFT
+     *
+     * Summary: SOUTH and NORTH have OUTER=RIGHT (outer edge is driver's right).
+     *          EAST and WEST have OUTER=RIGHT (outer edge is driver's right).
+     *
+     * In right-hand traffic, drivers stay on the RIGHT side of the road.
+     * The OUTER lane (furthest from road center) is always the RIGHT lane from driver's perspective.
+     */
+    private static getEffectiveLanePosition(travelDir: Direction, laneType: 'INNER' | 'OUTER'): 'LEFT' | 'RIGHT' {
+        // In right-hand traffic, OUTER lane is always the RIGHT side of travel
+        // INNER lane is always the LEFT side of travel (closer to oncoming traffic)
+        return laneType === 'OUTER' ? 'RIGHT' : 'LEFT';
+    }
+
+    private static getOppositeDirection(dir: Direction): Direction {
+        const opposites: Record<Direction, Direction> = {
+            'NORTH': 'SOUTH',
+            'SOUTH': 'NORTH',
+            'EAST': 'WEST',
+            'WEST': 'EAST'
+        };
+        return opposites[dir];
     }
 
     private static reconstructPath(node: Node): Vector2D[] {

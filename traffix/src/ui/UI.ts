@@ -37,10 +37,10 @@ export class UI {
                 <span id="version-display" style="color: #7f8c8d; font-size: 0.8rem;">${GAME_VERSION}</span>
             </div>
 
-            <div id="spawn-stuck-warning" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(231, 76, 60, 0.95); color: white; padding: 20px 40px; font-size: 1.5rem; border-radius: 12px; font-weight: bold; text-align: center; box-shadow: 0 0 30px rgba(0,0,0,0.7); z-index: 9999;">
+            <div id="spawn-stuck-warning" style="display: none; position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(231, 76, 60, 0.95); color: white; padding: 15px 30px; font-size: 1.2rem; border-radius: 8px; font-weight: bold; text-align: center; box-shadow: 0 0 20px rgba(0,0,0,0.7); z-index: 9999;">
                 SPAWN BLOCKED!
-                <div style="font-size: 0.9rem; margin-top: 8px;">Clear traffic or Game Over!</div>
-                <div id="countdown-timer" style="font-size: 3rem; margin-top: 10px; color: #f1c40f;">10</div>
+                <span style="font-size: 0.85rem; margin-left: 10px;">Clear traffic or Game Over!</span>
+                <span id="countdown-timer" style="font-size: 1.5rem; margin-left: 15px; color: #f1c40f;">10</span>
             </div>
 
             <div class="stats-panel">
@@ -102,8 +102,8 @@ export class UI {
                         </div>
                         <div class="input-group" style="margin-top: 3px;">
                             <label style="font-size: 0.7rem;">React:</label>
-                            <input type="range" id="car-reaction" min="5" max="60" step="1" value="20" style="width: 60%;">
-                            <span id="reaction-val" style="font-size: 0.7rem;">20 ticks</span>
+                            <input type="range" id="car-reaction" min="5" max="60" step="1" value="12" style="width: 60%;">
+                            <span id="reaction-val" style="font-size: 0.7rem;">12 ticks</span>
                         </div>
                     </div>
 
@@ -133,7 +133,7 @@ export class UI {
                             </div>
                             <div>
                                 <label>Game Over:</label>
-                                <input type="number" id="gameover-timeout" value="3000" step="100" style="width: 50px; background: #333; color: white; border: 1px solid #555; border-radius: 2px;">
+                                <input type="number" id="gameover-timeout" value="600" step="100" style="width: 50px; background: #333; color: white; border: 1px solid #555; border-radius: 2px;">
                             </div>
                         </div>
                         <div style="margin-top: 5px; font-size: 0.7rem;">
@@ -389,8 +389,8 @@ export class UI {
         (document.getElementById('crash-timeout') as HTMLInputElement).value = "300";
         this.simulation.collisionCleanupTimeout = 300;
 
-        (document.getElementById('gameover-timeout') as HTMLInputElement).value = "3000";
-        this.simulation.gameOverTimeout = 3000;
+        (document.getElementById('gameover-timeout') as HTMLInputElement).value = "600";
+        this.simulation.gameOverTimeout = 600;
 
         document.getElementById('pause-sim')!.innerText = 'Pause';
     }
@@ -469,25 +469,28 @@ export class UI {
                             <option value="all-way-stop" ${intersection.currentPreset === 'all-way-stop' ? 'selected' : ''}>All-Way Stop</option>
                             <option value="manual" ${intersection.currentPreset === 'manual' ? 'selected' : ''}>Manual</option>
                         </select>
+                        <button class="toggle-phases" data-int="${intIdx}" style="font-size:0.65rem;background:#444;color:white;border:1px solid #555;border-radius:3px;padding:2px 6px;cursor:pointer;">▼</button>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;font-size:0.7rem;">
-                    <div>
-                        <label style="color:#888;">Green:</label>
-                        <input type="number" class="timing-input" data-int="${intIdx}" data-timing="green" value="${intersection.presetConfig?.greenDuration || 180}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
-                    </div>
-                    <div>
-                        <label style="color:#888;">Yellow:</label>
-                        <input type="number" class="timing-input" data-int="${intIdx}" data-timing="yellow" value="${intersection.presetConfig?.yellowDuration || 30}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
-                    </div>
-                    <div>
-                        <label style="color:#888;">All-Red:</label>
-                        <input type="number" class="timing-input" data-int="${intIdx}" data-timing="allRed" value="${intersection.presetConfig?.allRedDuration || 30}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                <div class="timing-section" data-int="${intIdx}" style="display:none;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;font-size:0.7rem;">
+                        <div>
+                            <label style="color:#888;">Green:</label>
+                            <input type="number" class="timing-input" data-int="${intIdx}" data-timing="green" value="${intersection.presetConfig?.greenDuration || 180}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                        </div>
+                        <div>
+                            <label style="color:#888;">Yellow:</label>
+                            <input type="number" class="timing-input" data-int="${intIdx}" data-timing="yellow" value="${intersection.presetConfig?.yellowDuration || 30}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                        </div>
+                        <div>
+                            <label style="color:#888;">All-Red:</label>
+                            <input type="number" class="timing-input" data-int="${intIdx}" data-timing="allRed" value="${intersection.presetConfig?.allRedDuration || 30}" style="width:40px;background:#333;color:white;border:1px solid #555;border-radius:2px;">
+                        </div>
                     </div>
                 </div>
             `;
 
-            let phasesHtml = '<div class="phases-container" style="max-height:200px;overflow-y:auto;">';
+            let phasesHtml = '<div class="phases-container" data-int="' + intIdx + '" style="max-height:200px;overflow-y:auto;display:none;">';
             intersection.phases.forEach((phase, phaseIdx) => {
                 const isCurrent = intersection.currentPhaseIndex === phaseIdx;
                 phasesHtml += `
@@ -511,6 +514,25 @@ export class UI {
 
             div.innerHTML = headerHtml + phasesHtml;
             list.appendChild(div);
+        });
+
+        list.querySelectorAll('.toggle-phases').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const intIdx = (e.target as HTMLButtonElement).getAttribute('data-int')!;
+                const phasesContainer = list.querySelector(`.phases-container[data-int="${intIdx}"]`) as HTMLElement;
+                const timingSection = list.querySelector(`.timing-section[data-int="${intIdx}"]`) as HTMLElement;
+                const button = e.target as HTMLButtonElement;
+
+                if (phasesContainer.style.display === 'none') {
+                    phasesContainer.style.display = 'block';
+                    timingSection.style.display = 'block';
+                    button.innerText = '▲';
+                } else {
+                    phasesContainer.style.display = 'none';
+                    timingSection.style.display = 'none';
+                    button.innerText = '▼';
+                }
+            });
         });
 
         list.querySelectorAll('.preset-select').forEach(select => {
@@ -582,6 +604,9 @@ export class UI {
                 const pathInfo = vehicle.path ? `Path: ${vehicle.currentTargetIndex}/${vehicle.path.length}` : 'No path';
                 const destInfo = vehicle.destination ? ` -> (${vehicle.destination.x}, ${vehicle.destination.y})` : '';
 
+                const limitColor = vehicle.limitReason === 'CRUISING' ? '#2ecc71' :
+                                   vehicle.limitReason === 'RED_LIGHT' ? '#e74c3c' :
+                                   vehicle.limitReason === 'YIELDING' ? '#e67e22' : '#f1c40f';
                 selInfo.innerHTML = `
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
                         <strong style="color:#3498db;">${vehicle.id.substring(0,15)}...</strong>
@@ -590,8 +615,8 @@ export class UI {
                     <div style="font-size:0.8rem;">
                         <div>Pos: (${vehicle.position.x.toFixed(1)}, ${vehicle.position.y.toFixed(1)})${destInfo}</div>
                         <div>Vel: ${vehicle.velocity.toFixed(3)} | State: <span style="color:${isStuck ? '#e74c3c' : '#f1c40f'}">${vehicle.debugState}</span></div>
-                        <div>${pathInfo} | Stuck: ${vehicle.stuckTimer}</div>
-                        <div>Rebel: ${vehicle.violatesRules ? 'YES' : 'No'}</div>
+                        <div>${pathInfo} | Stuck: ${(vehicle.stuckTimer / 60).toFixed(1)}s</div>
+                        <div>Reason: <span style="color:${limitColor}">${vehicle.limitReason}</span> | Rebel: ${vehicle.violatesRules ? 'YES' : 'No'}</div>
                     </div>
                 `;
             } else {
@@ -674,37 +699,39 @@ export class UI {
 
         const popup = document.createElement('div');
         popup.id = 'intersection-popup';
-        popup.style.cssText = `position:fixed;left:${screenX}px;top:${screenY}px;background:rgba(0,0,0,0.95);color:white;padding:15px;border-radius:8px;font-family:monospace;z-index:10000;min-width:250px;box-shadow:0 0 20px rgba(0,0,0,0.5);border:1px solid #3498db;`;
+        popup.style.cssText = `position:fixed;left:${screenX}px;top:${screenY}px;background:rgba(0,0,0,0.95);color:white;padding:12px;border-radius:8px;font-family:monospace;z-index:10000;width:200px;box-shadow:0 0 20px rgba(0,0,0,0.5);border:1px solid #3498db;`;
 
         popup.innerHTML = `
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <strong style="color:#3498db;">${intersection.id}</strong>
-                <button id="close-popup" style="background:none;border:none;color:#888;cursor:pointer;font-size:1.2rem;">X</button>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <strong style="color:#3498db;font-size:0.9rem;">${intersection.id}</strong>
+                <button id="close-popup" style="background:none;border:none;color:#888;cursor:pointer;font-size:1rem;padding:0;line-height:1;">✕</button>
             </div>
-            <div style="margin-bottom:10px;">
-                <label style="font-size:0.8rem;color:#888;">Preset:</label>
-                <select id="popup-preset" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:4px;padding:5px;">
+            <div style="margin-bottom:8px;">
+                <select id="popup-preset" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:4px;padding:4px;font-size:0.8rem;">
                     <option value="opposite-phasing" ${intersection.currentPreset === 'opposite-phasing' ? 'selected' : ''}>Opposite (N-S / E-W)</option>
                     <option value="round-robin" ${intersection.currentPreset === 'round-robin' ? 'selected' : ''}>Round-Robin</option>
                     <option value="all-way-stop" ${intersection.currentPreset === 'all-way-stop' ? 'selected' : ''}>All-Way Stop</option>
                     <option value="manual" ${intersection.currentPreset === 'manual' ? 'selected' : ''}>Manual</option>
                 </select>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
-                <div>
-                    <label style="font-size:0.7rem;color:#888;">Green</label>
-                    <input type="number" id="popup-green" value="${intersection.presetConfig.greenDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:3px;">
+            <details style="margin-bottom:8px;">
+                <summary style="cursor:pointer;color:#888;font-size:0.75rem;">Timing Settings</summary>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-top:6px;">
+                    <div>
+                        <label style="font-size:0.65rem;color:#666;">Green</label>
+                        <input type="number" id="popup-green" value="${intersection.presetConfig.greenDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:2px;font-size:0.75rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.65rem;color:#666;">Yellow</label>
+                        <input type="number" id="popup-yellow" value="${intersection.presetConfig.yellowDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:2px;font-size:0.75rem;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.65rem;color:#666;">All-Red</label>
+                        <input type="number" id="popup-allred" value="${intersection.presetConfig.allRedDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:2px;font-size:0.75rem;">
+                    </div>
                 </div>
-                <div>
-                    <label style="font-size:0.7rem;color:#888;">Yellow</label>
-                    <input type="number" id="popup-yellow" value="${intersection.presetConfig.yellowDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:3px;">
-                </div>
-                <div>
-                    <label style="font-size:0.7rem;color:#888;">All-Red</label>
-                    <input type="number" id="popup-allred" value="${intersection.presetConfig.allRedDuration}" style="width:100%;background:#333;color:white;border:1px solid #555;border-radius:3px;padding:3px;">
-                </div>
-            </div>
-            <button id="apply-popup" style="width:100%;padding:8px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;">Apply Changes</button>
+            </details>
+            <button id="apply-popup" style="width:100%;padding:6px;background:#27ae60;color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem;">Apply</button>
         `;
 
         document.body.appendChild(popup);

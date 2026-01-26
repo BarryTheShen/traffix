@@ -309,6 +309,61 @@ export class Renderer {
                 )
                 .stroke({ width: 2, color: 0x2ecc71 });
         }
+
+        // Debug: Show lane info for selected car
+        if (state.rebelDebug && path.length > 0) {
+            const entryCell = state.grid[path[0].y]?.[path[0].x];
+            if (entryCell) {
+                const dir = entryCell.allowedDirections?.[0] || '?';
+                const lane = entryCell.laneType || '?';
+
+                // Determine effective side - OUTER is always RIGHT side in right-hand traffic
+                const effectiveSide = lane === 'OUTER' ? 'RIGHT' : 'LEFT';
+
+                // Find first turn
+                let turnInfo = 'STRAIGHT';
+                for (let i = 1; i < path.length; i++) {
+                    const prevCell = state.grid[path[i-1].y]?.[path[i-1].x];
+                    const currCell = state.grid[path[i].y]?.[path[i].x];
+                    if (prevCell?.type === 'intersection' && currCell?.type === 'road') {
+                        const dx = path[i].x - path[i-1].x;
+                        const dy = path[i].y - path[i-1].y;
+                        const exitDir = dx > 0 ? 'EAST' : dx < 0 ? 'WEST' : dy > 0 ? 'SOUTH' : 'NORTH';
+
+                        if (dir !== exitDir) {
+                            const turnMap: Record<string, Record<string, string>> = {
+                                'NORTH': { 'WEST': 'LEFT', 'EAST': 'RIGHT' },
+                                'SOUTH': { 'EAST': 'LEFT', 'WEST': 'RIGHT' },
+                                'EAST':  { 'NORTH': 'LEFT', 'SOUTH': 'RIGHT' },
+                                'WEST':  { 'SOUTH': 'LEFT', 'NORTH': 'RIGHT' }
+                            };
+                            turnInfo = turnMap[dir]?.[exitDir] || 'STRAIGHT';
+                        }
+                        break;
+                    }
+                }
+
+                const isViolation =
+                    (effectiveSide === 'LEFT' && turnInfo === 'RIGHT') ||
+                    (effectiveSide === 'RIGHT' && turnInfo === 'LEFT');
+
+                const debugText = new PIXI.Text({
+                    text: `${dir} ${lane}\n${effectiveSide} side\n${turnInfo} turn\n${isViolation ? 'VIOLATION!' : 'OK'}`,
+                    style: {
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        fill: isViolation ? 0xff0000 : 0x00ff00,
+                        stroke: { color: 0x000000, width: 2 }
+                    }
+                });
+                debugText.anchor.set(0, 0);
+                debugText.position.set(
+                    vehicle.position.x * this.cellSize + this.cellSize,
+                    vehicle.position.y * this.cellSize - 40
+                );
+                this.labelContainer.addChild(debugText);
+            }
+        }
     }
 
     public clearCache() { this.gridRendered = false; this.intersectionBounds.clear(); }

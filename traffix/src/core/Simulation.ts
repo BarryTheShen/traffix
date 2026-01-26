@@ -7,7 +7,7 @@ import { TrafficLightController } from './TrafficLightController';
 import { Intersection } from './Intersection';
 
 // Version constant
-export const GAME_VERSION = 'v0.2.0.1';
+export const GAME_VERSION = 'v0.2.1';
 
 export class Simulation {
     private state: SimulationState;
@@ -22,7 +22,7 @@ export class Simulation {
     // Game Balance Config
     public stuckCleanupTimeout: number = 2700;
     public collisionCleanupTimeout: number = 300;
-    public gameOverTimeout: number = 3000;
+    public gameOverTimeout: number = 600;
     public crashPenalty: number = 1000;
     public currentLevel: string = 'level1';
     public baseSpawnRate: number = 1.0;
@@ -45,7 +45,7 @@ export class Simulation {
     // Car Config (synced to carConfig global)
     public carAcceleration: number = 0.008;
     public carDeceleration: number = 0.025;
-    public carReactionTime: number = 20;
+    public carReactionTime: number = 12;
     public rebelChance: number = 0.0; // Default 0% for benchmark
     public rebelDebug: boolean = false;
     public collisionRecovery: boolean = true;

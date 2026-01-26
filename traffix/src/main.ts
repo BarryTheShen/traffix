@@ -33,6 +33,8 @@ async function init() {
       simulation.selectedVehicleId = vehicleId;
       (window as any).renderer.debugMode = true;
       ui.log(`Selected: ${vehicleId}`);
+      // Immediately render to show path (tick-independent)
+      renderer.render(simulation.getState());
       return;
     }
 

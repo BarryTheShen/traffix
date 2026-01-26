@@ -1,5 +1,5 @@
 /**
- * Benchmark Tests for Traffix v0.2.0.1
+ * Benchmark Tests for Traffix v0.2.0.2
  *
  * Success criteria:
  * - 0 cars collided
