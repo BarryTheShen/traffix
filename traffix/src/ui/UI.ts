@@ -417,20 +417,43 @@ export class UI {
                 </div>
             </div>
             <h3 style="margin-bottom: 15px; color: #ecf0f1;">Select Level</h3>
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 15px;">
                 <button class="level-btn" data-level="tutorial" style="padding: 12px 24px; font-size: 1.1rem; background: #e67e22; color: white; border: none; border-radius: 8px; cursor: pointer;">Tutorial</button>
                 <button class="level-btn" data-level="classic" style="padding: 12px 24px; font-size: 1.1rem; background: #27ae60; color: white; border: none; border-radius: 8px; cursor: pointer;">Classic</button>
                 <button class="level-btn" data-level="level1" style="padding: 12px 24px; font-size: 1.1rem; background: #3498db; color: white; border: none; border-radius: 8px; cursor: pointer;">Level 1</button>
                 <button class="level-btn" data-level="level2" style="padding: 12px 24px; font-size: 1.1rem; background: #9b59b6; color: white; border: none; border-radius: 8px; cursor: pointer;">Level 2</button>
-                <button class="level-btn" data-level="random" style="padding: 12px 24px; font-size: 1.1rem; background: #c0392b; color: white; border: none; border-radius: 8px; cursor: pointer;">Random</button>
+            </div>
+            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 15px; background: rgba(192, 57, 43, 0.2); border-radius: 8px; border: 1px solid #c0392b;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <label style="color: #ecf0f1;">Complexity:</label>
+                    <input type="range" id="random-complexity" min="1" max="5" step="1" value="3" style="width: 150px;">
+                    <span id="complexity-val" style="color: #f1c40f; min-width: 20px;">3</span>
+                </div>
+                <button class="level-btn" data-level="random" style="padding: 12px 40px; font-size: 1.1rem; background: #c0392b; color: white; border: none; border-radius: 8px; cursor: pointer;">Random Map</button>
             </div>
         `;
         this.container.appendChild(startScreen);
         this.simulation.timeScale = 0;
+
+        // Handle complexity slider
+        const complexitySlider = startScreen.querySelector('#random-complexity') as HTMLInputElement;
+        const complexityVal = startScreen.querySelector('#complexity-val') as HTMLSpanElement;
+        if (complexitySlider && complexityVal) {
+            complexitySlider.addEventListener('input', () => {
+                complexityVal.textContent = complexitySlider.value;
+            });
+        }
+
         startScreen.querySelectorAll('.level-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const level = (e.target as HTMLElement).getAttribute('data-level')!;
                 this.simulation.currentLevel = level;
+
+                // Set complexity for random maps
+                if (level === 'random' && complexitySlider) {
+                    this.simulation.mapComplexity = parseInt(complexitySlider.value);
+                }
+
                 this.simulation.reset();
                 if ((window as any).renderer) (window as any).renderer.clearCache();
                 this.renderIntersections();

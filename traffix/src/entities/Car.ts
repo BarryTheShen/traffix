@@ -57,6 +57,8 @@ export class Car {
     private reactionTimer: number = 0;
     private isWaitingToStart: boolean = false;
     private wasBlocked: boolean = false;
+    private wasStoppedBehindCar: boolean = false;  // Track if stopped behind another car
+    private leadCarWasStopped: boolean = false;    // Track if lead car was stopped
 
     // Collision nodes - calculated based on heading (8 nodes around the car)
     private collisionNodes: Vector2D[] = [];
@@ -168,6 +170,7 @@ export class Car {
         if (this.currentTargetIndex >= this.path.length) {
             this.debugState = 'ARRIVED';
             this.velocity = 0;
+            this.updateCollisionNodes();  // Still update collision nodes so other cars can see us
             return;
         }
 
@@ -211,15 +214,24 @@ export class Car {
         // 2. Lead Vehicle Detection (edge-to-edge, same direction)
         // Skip if we've been stuck too long - prevent infinite stuck chains
         const leadInfo = (this.stuckTimer < 300) ? this.getLeadVehicleInfo(otherCars) : null;
+        let leadCarStopped = false;
         if (leadInfo) {
-            const followGap = 0.3;  // Target gap: slightly more than half car width
+            const followGap = this.length * 0.5;  // Target gap: half car length (0.35 units)
             const effectiveDist = leadInfo.distance - followGap;
+            leadCarStopped = leadInfo.velocity < 0.01;
 
             if (effectiveDist < obstacleDistance) {
                 obstacleDistance = effectiveDist;
                 obstacleVelocity = leadInfo.velocity;
                 this.limitReason = 'CAR_AHEAD';
-                if (effectiveDist < 0.1) isHardBlock = true;  // More aggressive hard block
+                // Emergency hard block only if about to physically overlap (< 0.05 units)
+                if (effectiveDist < 0.05) isHardBlock = true;
+
+                // Track if we're close and stopped behind a stopped car (for wave effect)
+                if (this.velocity < 0.01 && leadCarStopped && effectiveDist < 2.0) {
+                    this.wasStoppedBehindCar = true;
+                    this.leadCarWasStopped = true;
+                }
             }
         }
 
@@ -283,23 +295,45 @@ export class Car {
             if (dSq < 1.0) this.spawnStuckTimer++;
         } else {
             this.stuckTimer = 0;
-            this.spawnStuckTimer = 0;
+            // Only reset spawnStuckTimer if car has moved significantly away from spawn
+            const dSq = (this.position.x - this.startPos.x) ** 2 + (this.position.y - this.startPos.y) ** 2;
+            if (dSq >= 4.0) {
+                this.spawnStuckTimer = 0;  // At least 2 cells from spawn
+            }
         }
     }
 
     /**
      * Apply realistic kinematic physics for acceleration/deceleration
      *
-     * Uses kinematic equation: d = v² / (2a) for braking distance
-     * Short distance: accelerate, then decelerate smoothly
-     * Long distance: accelerate to max, cruise, then decelerate
+     * Dynamic Following Distance (3-phase calculation):
+     * Phase 1: Reaction distance - car travels at current velocity for reactionTime ticks
+     * Phase 2: Catch-up distance - relative speed × time for lead car to stop
+     * Phase 3: Own stopping distance + minimum gap (0.5 car lengths)
+     *
+     * If car cannot decelerate in time, it will crash (except at red lights where
+     * isHardBlock=true allows instant stop since driver knew it was coming)
      */
     private applyKinematics(obstacleDistance: number, obstacleVelocity: number, isHardBlock: boolean, timeScale: number) {
         const acc = this.acceleration * timeScale;
         const dec = this.deceleration * timeScale;
         const maxV = this.maxVelocity * timeScale;
+        const minGap = this.length * 0.5;  // Minimum gap: half car length (0.35 units)
 
-        // If obstacle cleared and we were waiting, start reaction timer
+        // Wave effect: If we were stopped behind a stopped car and it starts moving,
+        // trigger reaction timer to create the wave/domino effect
+        if (this.wasStoppedBehindCar && this.velocity < 0.01) {
+            // Lead car is now moving (obstacleVelocity > 0)
+            if (obstacleVelocity > 0.01 && this.leadCarWasStopped) {
+                if (!this.isWaitingToStart) {
+                    this.isWaitingToStart = true;
+                    this.reactionTimer = this.reactionTime;
+                }
+                this.leadCarWasStopped = false;  // Reset so we only trigger once
+            }
+        }
+
+        // Also trigger reaction timer when red light clears
         if (!isHardBlock && this.wasBlocked && this.velocity < 0.01) {
             if (!this.isWaitingToStart) {
                 this.isWaitingToStart = true;
@@ -314,11 +348,12 @@ export class Car {
             this.debugState = 'REACTING';
             if (this.reactionTimer <= 0) {
                 this.isWaitingToStart = false;
+                this.wasStoppedBehindCar = false;  // Reset after reaction complete
             }
             return;
         }
 
-        // Hard blocked - immediate stop
+        // Hard blocked (red lights only) - driver knew it was coming, can stop instantly
         if (isHardBlock) {
             this.velocity = 0;
             this.debugState = 'STOPPED';
@@ -332,43 +367,66 @@ export class Car {
             return;
         }
 
-        // Calculate required braking distance: d = (v² - v_target²) / (2 * decel)
+        // ===== 3-PHASE DYNAMIC FOLLOWING DISTANCE CALCULATION =====
+
+        // Phase 1: Reaction distance (travel during reaction time)
+        // Car continues at current velocity for reactionTime ticks before reacting
+        const reactionDistance = this.velocity * (this.reactionTime / 60);
+
+        // Phase 2: Catch-up distance during lead car's braking
+        // If lead car is moving and will brake, we close the gap at relative speed
+        // Time for lead car to stop: t = v_lead / decel
         const relativeVelocity = this.velocity - obstacleVelocity;
-        const brakingDistance = relativeVelocity > 0
-            ? (relativeVelocity * relativeVelocity) / (2 * dec)
-            : 0;
+        let catchUpDistance = 0;
+        if (relativeVelocity > 0 && obstacleVelocity > 0) {
+            const leadStopTime = obstacleVelocity / dec;
+            catchUpDistance = relativeVelocity * leadStopTime * 0.5;  // Average during decel
+        }
 
-        // Safety margin based on reaction time
-        const safetyMargin = this.velocity * (this.reactionTime / 60) * 0.3;
-        const totalStoppingDistance = brakingDistance + safetyMargin;
+        // Phase 3: Own stopping distance after reacting
+        // d = v² / (2 * decel)
+        const ownStoppingDistance = (this.velocity * this.velocity) / (2 * dec);
 
-        if (obstacleDistance <= totalStoppingDistance) {
-            // Need to brake
+        // Total required following distance
+        const requiredFollowDist = reactionDistance + catchUpDistance + ownStoppingDistance + minGap;
+
+        if (obstacleDistance <= requiredFollowDist) {
+            // Need to brake - we're within following distance
             if (obstacleDistance <= 0.08) {
-                // Very close - match obstacle velocity
-                this.velocity = Math.max(0, obstacleVelocity);
+                // Very close - match obstacle velocity (no instant stop unless isHardBlock)
+                // Decelerate aggressively but not instantly
+                const targetV = Math.max(0, obstacleVelocity);
+                this.velocity = Math.max(targetV, this.velocity - dec * 2);
             } else {
-                // Calculate required deceleration: a = (v² - v_target²) / (2 * d)
-                const requiredDecel = relativeVelocity > 0
-                    ? (relativeVelocity * relativeVelocity) / (2 * Math.max(0.01, obstacleDistance))
-                    : dec;
+                // Calculate required deceleration to stop/match in remaining distance
+                const distAfterReaction = obstacleDistance - reactionDistance;
 
-                // Apply deceleration (capped at max comfortable decel * 3 for emergencies)
-                const appliedDecel = Math.min(requiredDecel, dec * 3);
-                this.velocity = Math.max(obstacleVelocity, this.velocity - appliedDecel);
+                if (distAfterReaction > 0) {
+                    // Still have distance after reaction - normal braking
+                    const requiredDecel = relativeVelocity > 0
+                        ? (relativeVelocity * relativeVelocity) / (2 * Math.max(0.01, distAfterReaction))
+                        : dec;
+
+                    // Apply deceleration (max 2x normal for emergencies)
+                    const appliedDecel = Math.min(requiredDecel, dec * 2);
+                    this.velocity = Math.max(obstacleVelocity, this.velocity - appliedDecel);
+                } else {
+                    // Already past reaction distance - emergency braking
+                    this.velocity = Math.max(obstacleVelocity, this.velocity - dec * 2);
+                }
             }
             this.debugState = 'BRAKING';
         } else {
-            // Can accelerate or cruise
-            // Max approach velocity that allows stopping in time: v = sqrt(2 * a * d)
-            const maxApproachVelocity = Math.sqrt(2 * dec * obstacleDistance) + obstacleVelocity;
-            const targetVelocity = Math.min(maxV, maxApproachVelocity);
+            // Outside following distance - can accelerate or cruise
+            // Calculate max safe velocity that allows stopping in time
+            const maxApproachVelocity = Math.sqrt(2 * dec * (obstacleDistance - reactionDistance - minGap)) + obstacleVelocity;
+            const targetVelocity = Math.min(maxV, Math.max(0, maxApproachVelocity));
 
             if (this.velocity < targetVelocity - 0.001) {
                 this.velocity = Math.min(this.velocity + acc, targetVelocity);
                 this.debugState = obstacleDistance > 5 ? 'ACCEL' : 'APPROACH';
             } else if (this.velocity > targetVelocity + 0.001) {
-                this.velocity = Math.max(targetVelocity, this.velocity - dec * 0.3);
+                this.velocity = Math.max(targetVelocity, this.velocity - dec * 0.5);
                 this.debugState = 'MATCHING';
             } else {
                 this.velocity = targetVelocity;
@@ -384,7 +442,7 @@ export class Car {
      */
     private getLeadVehicleInfo(otherCars: Car[]): { distance: number; velocity: number; id: string } | null {
         let closest: { distance: number; velocity: number; id: string } | null = null;
-        let minDist = 8;
+        let minDist = 15;  // Detection range for lead vehicles (increased for longer roads)
 
         for (const other of otherCars) {
             if (other.id === this.id || other.isCollided) continue;

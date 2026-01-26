@@ -226,8 +226,17 @@ export class Renderer {
         const worldY = (y - this.gridContainer.y) / this.gridContainer.scale.y;
         const gridX = worldX / this.cellSize;
         const gridY = worldY / this.cellSize;
-        const found = state.vehicles.find(v => Math.sqrt((v.position.x + 0.5 - gridX)**2 + (v.position.y + 0.5 - gridY)**2) < 1.0);
-        return found ? found.id : null;
+
+        // Find the closest vehicle within click range
+        // Vehicle position is already the center, no offset needed
+        let closest: { id: string; dist: number } | null = null;
+        for (const v of state.vehicles) {
+            const dist = Math.sqrt((v.position.x - gridX)**2 + (v.position.y - gridY)**2);
+            if (dist < 0.8 && (!closest || dist < closest.dist)) {
+                closest = { id: v.id, dist };
+            }
+        }
+        return closest ? closest.id : null;
     }
 
     /**

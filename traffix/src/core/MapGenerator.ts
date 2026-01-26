@@ -100,44 +100,77 @@ export class MapGenerator {
         }
     }
 
-    public static generateLevel(level: string, width: number, height: number): { grid: GridCell[][], intersections: { x: number, y: number }[] } {
+    public static generateLevel(level: string, width: number, height: number, complexity: number = 3): { grid: GridCell[][], intersections: { x: number, y: number }[] } {
         const grid = this.createEmptyGrid(width, height);
         let intersections: { x: number, y: number }[] = [];
 
+        // Use full map width/height with proper margins
+        // Roads span edge-to-edge for maximum queuing space
+
         if (level === 'tutorial') {
-             this.addRoad(grid, 'y', 40, 2);
-             this.addRoad(grid, 'x', 20, 2);
-             intersections = [{ x: 40, y: 20 }];
+            // Single intersection centered
+            const cx = Math.floor(width / 2);
+            const cy = Math.floor(height / 2);
+            this.addRoad(grid, 'y', cx, 2);  // Full vertical road
+            this.addRoad(grid, 'x', cy, 2);  // Full horizontal road
+            intersections = [{ x: cx, y: cy }];
         } else if (level === 'classic') {
-             this.addRoad(grid, 'y', 40, 2);
-             this.addRoad(grid, 'x', 20, 2, 40, width);
-             intersections = [{ x: 40, y: 20 }];
+            // T-junction - vertical road with horizontal branch
+            const cx = Math.floor(width / 2);
+            const cy = Math.floor(height / 2);
+            this.addRoad(grid, 'y', cx, 2);  // Full vertical road
+            this.addRoad(grid, 'x', cy, 2, cx, width);  // Horizontal from center to right
+            intersections = [{ x: cx, y: cy }];
         } else if (level === 'level1') {
-            this.addRoad(grid, 'y', 20, 2);
-            this.addRoad(grid, 'y', 40, 2, 0, 22);
-            this.addRoad(grid, 'y', 60, 2);
-            this.addRoad(grid, 'x', 10, 2);
-            this.addRoad(grid, 'x', 20, 2, 10, 50);
-            this.addRoad(grid, 'x', 30, 2);
+            // 7 intersections in irregular pattern - spread across full map
+            const x1 = Math.floor(width * 0.2);
+            const x2 = Math.floor(width * 0.5);
+            const x3 = Math.floor(width * 0.8);
+            const y1 = Math.floor(height * 0.2);
+            const y2 = Math.floor(height * 0.5);
+            const y3 = Math.floor(height * 0.8);
+
+            // Vertical roads (full length)
+            this.addRoad(grid, 'y', x1, 2);
+            this.addRoad(grid, 'y', x2, 2, 0, y2 + 3);  // Partial - creates T-junctions
+            this.addRoad(grid, 'y', x3, 2);
+
+            // Horizontal roads (full length)
+            this.addRoad(grid, 'x', y1, 2);
+            this.addRoad(grid, 'x', y2, 2, x1 - 2, x2 + 3);  // Partial segment
+            this.addRoad(grid, 'x', y3, 2);
+
             intersections = [
-                { x: 20, y: 10 }, { x: 40, y: 10 }, { x: 60, y: 10 },
-                { x: 20, y: 20 }, { x: 40, y: 20 },
-                { x: 20, y: 30 }, { x: 60, y: 30 }
+                { x: x1, y: y1 }, { x: x2, y: y1 }, { x: x3, y: y1 },
+                { x: x1, y: y2 }, { x: x2, y: y2 },
+                { x: x1, y: y3 }, { x: x3, y: y3 }
             ];
         } else if (level === 'level2') {
-             this.addRoad(grid, 'y', 20, 2);
-             this.addRoad(grid, 'y', 40, 2);
-             this.addRoad(grid, 'y', 60, 2);
-             this.addRoad(grid, 'x', 10, 2);
-             this.addRoad(grid, 'x', 20, 2);
-             this.addRoad(grid, 'x', 30, 2);
-             intersections = [
-                 { x: 20, y: 10 }, { x: 40, y: 10 }, { x: 60, y: 10 },
-                 { x: 20, y: 20 }, { x: 40, y: 20 }, { x: 60, y: 20 },
-                 { x: 20, y: 30 }, { x: 40, y: 30 }, { x: 60, y: 30 }
-             ];
+            // 9 intersections in 3x3 grid - spread across full map
+            const x1 = Math.floor(width * 0.2);
+            const x2 = Math.floor(width * 0.5);
+            const x3 = Math.floor(width * 0.8);
+            const y1 = Math.floor(height * 0.2);
+            const y2 = Math.floor(height * 0.5);
+            const y3 = Math.floor(height * 0.8);
+
+            // Vertical roads (full length)
+            this.addRoad(grid, 'y', x1, 2);
+            this.addRoad(grid, 'y', x2, 2);
+            this.addRoad(grid, 'y', x3, 2);
+
+            // Horizontal roads (full length)
+            this.addRoad(grid, 'x', y1, 2);
+            this.addRoad(grid, 'x', y2, 2);
+            this.addRoad(grid, 'x', y3, 2);
+
+            intersections = [
+                { x: x1, y: y1 }, { x: x2, y: y1 }, { x: x3, y: y1 },
+                { x: x1, y: y2 }, { x: x2, y: y2 }, { x: x3, y: y2 },
+                { x: x1, y: y3 }, { x: x2, y: y3 }, { x: x3, y: y3 }
+            ];
         } else if (level === 'random') {
-             return this.generateRandomLevel(width, height);
+             return this.generateRandomLevel(width, height, complexity);
         }
 
         intersections.forEach((i, idx) => this.addIntersection(grid, i.x, i.y, 2, `int${idx}`));
@@ -146,112 +179,202 @@ export class MapGenerator {
         return { grid, intersections };
     }
 
-    private static generateRandomLevel(width: number, height: number): { grid: GridCell[][], intersections: { x: number, y: number }[] } {
+    /**
+     * Generate a random level with a grid-based layout.
+     * @param complexity 1-5, controls grid size (1=1x1, 2=2x1, 3=2x2, 4=3x2, 5=3x3)
+     */
+    private static generateRandomLevel(width: number, height: number, complexity: number = 3): { grid: GridCell[][], intersections: { x: number, y: number }[] } {
         const grid = this.createEmptyGrid(width, height);
-        const xAnchors = [15, 40, 65];
-        const yAnchors = [10, 20, 30];
 
-        const potentialEdges: {n1: any, n2: any}[] = [];
-        for (let i = 0; i < xAnchors.length; i++) {
-            for (let j = 0; j < yAnchors.length; j++) {
-                if (i < xAnchors.length - 1) potentialEdges.push({n1: {x: xAnchors[i], y: yAnchors[j]}, n2: {x: xAnchors[i+1], y: yAnchors[j]}});
-                if (j < yAnchors.length - 1) potentialEdges.push({n1: {x: xAnchors[i], y: yAnchors[j]}, n2: {x: xAnchors[i], y: yAnchors[j+1]}});
+        // Clamp complexity to 1-5
+        complexity = Math.max(1, Math.min(5, complexity));
+
+        // Define grid dimensions based on complexity
+        // Complexity 1: 1 intersection, 2: 2 intersections, 3: 4 (2x2), 4: 6 (3x2), 5: 9 (3x3)
+        const gridConfigs: { cols: number, rows: number }[] = [
+            { cols: 1, rows: 1 },  // complexity 1
+            { cols: 2, rows: 1 },  // complexity 2
+            { cols: 2, rows: 2 },  // complexity 3
+            { cols: 3, rows: 2 },  // complexity 4
+            { cols: 3, rows: 3 },  // complexity 5
+        ];
+        const config = gridConfigs[complexity - 1];
+
+        // Calculate evenly spaced positions
+        const xPositions: number[] = [];
+        const yPositions: number[] = [];
+
+        for (let c = 0; c < config.cols; c++) {
+            const x = Math.floor(width * (c + 1) / (config.cols + 1));
+            xPositions.push(x);
+        }
+        for (let r = 0; r < config.rows; r++) {
+            const y = Math.floor(height * (r + 1) / (config.rows + 1));
+            yPositions.push(y);
+        }
+
+        // Draw vertical roads at each x position (full height)
+        for (const x of xPositions) {
+            this.addRoad(grid, 'y', x, 2);
+        }
+
+        // Draw horizontal roads at each y position (full width)
+        for (const y of yPositions) {
+            this.addRoad(grid, 'x', y, 2);
+        }
+
+        // Calculate intersection positions (where roads cross)
+        const intersections: { x: number, y: number }[] = [];
+        for (const x of xPositions) {
+            for (const y of yPositions) {
+                intersections.push({ x, y });
             }
         }
 
-        potentialEdges.sort(() => Math.random() - 0.5);
-        const parent = new Map<string, string>();
-        const find = (s: string): string => {
-            if (!parent.has(s)) parent.set(s, s);
-            if (parent.get(s) === s) return s;
-            const root = find(parent.get(s)!);
-            parent.set(s, root);
-            return root;
-        };
-        const union = (s1: string, s2: string) => {
-            const r1 = find(s1);
-            const r2 = find(s2);
-            if (r1 !== r2) parent.set(r1, r2);
-        };
-
-        const activeEdges: {n1: any, n2: any}[] = [];
-        potentialEdges.forEach(e => {
-            const s1 = `${e.n1.x},${e.n1.y}`;
-            const s2 = `${e.n2.x},${e.n2.y}`;
-            if (find(s1) !== find(s2) || Math.random() < 0.3) {
-                union(s1, s2);
-                activeEdges.push(e);
-            }
-        });
-
-        const nodes = new Set<string>();
-        activeEdges.forEach(e => { nodes.add(`${e.n1.x},${e.n1.y}`); nodes.add(`${e.n2.x},${e.n2.y}`); });
-
-        const entranceConnections = new Map<string, number>();
-        nodes.forEach(s => {
-            const [x, y] = s.split(',').map(Number);
-            let count = 0;
-            if (x === 15 || x === 65 || y === 10 || y === 30) {
-                count = 1;
-            }
-            entranceConnections.set(s, count);
-        });
-
-        activeEdges.forEach(e => {
-            if (e.n1.x === e.n2.x) {
-                this.addRoad(grid, 'y', e.n1.x, 2, Math.min(e.n1.y, e.n2.y) - 5, Math.max(e.n1.y, e.n2.y) + 5);
-            } else {
-                this.addRoad(grid, 'x', e.n1.y, 2, Math.min(e.n1.x, e.n2.x) - 5, Math.max(e.n1.x, e.n2.x) + 5);
-            }
-        });
-
-        nodes.forEach(s => {
-            const [x, y] = s.split(',').map(Number);
-            if (x === 15) this.addRoad(grid, 'x', y, 2, 0, 15 + 5);
-            if (x === 65) this.addRoad(grid, 'x', y, 2, 65 - 5, width);
-            if (y === 10) this.addRoad(grid, 'y', x, 2, 0, 10 + 5);
-            if (y === 30) this.addRoad(grid, 'y', x, 2, 30 - 5, height);
-        });
-
-        const intersections: {x: number, y: number}[] = [];
-        nodes.forEach(s => {
-            const [nx, ny] = s.split(',').map(Number);
-            const connEdges = activeEdges.filter(e =>
-                (e.n1.x === nx && e.n1.y === ny) || (e.n2.x === nx && e.n2.y === ny)
-            );
-            const internalConnections = connEdges.length;
-            const totalConnections = internalConnections + (entranceConnections.get(s) || 0);
-
-            let isJunction = totalConnections >= 3;
-            if (totalConnections === 2) {
-                const hasEntranceX = (nx === 15 || nx === 65);
-                const hasEntranceY = (ny === 10 || ny === 30);
-
-                let isStraight = false;
-                if (internalConnections === 2) {
-                    const e1 = connEdges[0];
-                    const e2 = connEdges[1];
-                    const isStraightX = e1.n1.y === e1.n2.y && e2.n1.y === e2.n2.y;
-                    const isStraightY = e1.n1.x === e1.n2.x && e2.n1.x === e2.n2.x;
-                    isStraight = isStraightX || isStraightY;
-                } else if (internalConnections === 1) {
-                    const e1 = connEdges[0];
-                    if (hasEntranceX && e1.n1.y === e1.n2.y) isStraight = true;
-                    if (hasEntranceY && e1.n1.x === e1.n2.x) isStraight = true;
-                }
-
-                if (!isStraight) isJunction = true;
-            }
-
-            if (isJunction) {
-                intersections.push({x: nx, y: ny});
-            }
-        });
-
-        // Add intersections with proper IDs matching Simulation's naming
+        // Add intersection markers
         intersections.forEach((i, idx) => this.addIntersection(grid, i.x, i.y, 2, `int${idx}`));
 
         this.finalizeMap(grid);
         return { grid, intersections };
+    }
+
+    /**
+     * Draw a road between two nodes, optionally with a zig-zag pattern.
+     */
+    private static drawRoadBetween(
+        grid: GridCell[][],
+        n1: { x: number, y: number },
+        n2: { x: number, y: number },
+        width: number,
+        height: number
+    ) {
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
+
+        // Decide whether to use zig-zag (for non-axis-aligned connections)
+        const useZigZag = Math.abs(dx) > 5 && Math.abs(dy) > 5 && Math.random() > 0.3;
+
+        if (useZigZag) {
+            // L-shaped connection with random bend point
+            const bendRatio = 0.3 + Math.random() * 0.4;
+            const horizontalFirst = Math.random() > 0.5;
+
+            if (horizontalFirst) {
+                // Horizontal then vertical
+                const bendX = Math.round(n1.x + dx * bendRatio);
+                this.addRoad(grid, 'x', n1.y, 2, Math.min(n1.x, bendX) - 2, Math.max(n1.x, bendX) + 2);
+                this.addRoad(grid, 'y', bendX, 2, Math.min(n1.y, n2.y) - 2, Math.max(n1.y, n2.y) + 2);
+                this.addRoad(grid, 'x', n2.y, 2, Math.min(bendX, n2.x) - 2, Math.max(bendX, n2.x) + 2);
+            } else {
+                // Vertical then horizontal
+                const bendY = Math.round(n1.y + dy * bendRatio);
+                this.addRoad(grid, 'y', n1.x, 2, Math.min(n1.y, bendY) - 2, Math.max(n1.y, bendY) + 2);
+                this.addRoad(grid, 'x', bendY, 2, Math.min(n1.x, n2.x) - 2, Math.max(n1.x, n2.x) + 2);
+                this.addRoad(grid, 'y', n2.x, 2, Math.min(bendY, n2.y) - 2, Math.max(bendY, n2.y) + 2);
+            }
+        } else {
+            // Simple L-shaped or straight connection
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Mostly horizontal - go horizontal then vertical
+                this.addRoad(grid, 'x', n1.y, 2, Math.min(n1.x, n2.x) - 2, Math.max(n1.x, n2.x) + 2);
+                if (Math.abs(dy) > 2) {
+                    this.addRoad(grid, 'y', n2.x, 2, Math.min(n1.y, n2.y) - 2, Math.max(n1.y, n2.y) + 2);
+                }
+            } else {
+                // Mostly vertical - go vertical then horizontal
+                this.addRoad(grid, 'y', n1.x, 2, Math.min(n1.y, n2.y) - 2, Math.max(n1.y, n2.y) + 2);
+                if (Math.abs(dx) > 2) {
+                    this.addRoad(grid, 'x', n2.y, 2, Math.min(n1.x, n2.x) - 2, Math.max(n1.x, n2.x) + 2);
+                }
+            }
+        }
+    }
+
+    /**
+     * Detect all junctions (3+ way intersections) in the grid.
+     * A junction is where roads meet from 3 or more directions.
+     */
+    private static detectJunctions(grid: GridCell[][], nodeHints: { x: number, y: number }[]): { x: number, y: number }[] {
+        const junctions: { x: number, y: number }[] = [];
+        const height = grid.length;
+        const width = grid[0].length;
+        const checked = new Set<string>();
+
+        // Check each node hint location and surrounding area
+        for (const node of nodeHints) {
+            // Scan area around node
+            for (let dy = -3; dy <= 3; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                    const x = node.x + dx;
+                    const y = node.y + dy;
+                    const key = `${x},${y}`;
+
+                    if (checked.has(key)) continue;
+                    checked.add(key);
+
+                    if (x < 0 || x >= width || y < 0 || y >= height) continue;
+                    if (grid[y][x].type !== 'road') continue;
+
+                    // Count incoming road directions
+                    const directions = new Set<string>();
+
+                    // Check NORTH (road coming from above going SOUTH)
+                    if (y > 0 && grid[y-1][x].type === 'road' && grid[y-1][x].allowedDirections.includes('SOUTH')) {
+                        directions.add('NORTH');
+                    }
+                    // Check SOUTH (road coming from below going NORTH)
+                    if (y < height - 1 && grid[y+1][x].type === 'road' && grid[y+1][x].allowedDirections.includes('NORTH')) {
+                        directions.add('SOUTH');
+                    }
+                    // Check WEST (road coming from left going EAST)
+                    if (x > 0 && grid[y][x-1].type === 'road' && grid[y][x-1].allowedDirections.includes('EAST')) {
+                        directions.add('WEST');
+                    }
+                    // Check EAST (road coming from right going WEST)
+                    if (x < width - 1 && grid[y][x+1].type === 'road' && grid[y][x+1].allowedDirections.includes('WEST')) {
+                        directions.add('EAST');
+                    }
+
+                    // 3+ directions = junction that needs traffic light
+                    if (directions.size >= 3) {
+                        // Check if we already have a junction nearby
+                        const tooClose = junctions.some(j =>
+                            Math.abs(j.x - x) < 4 && Math.abs(j.y - y) < 4
+                        );
+                        if (!tooClose) {
+                            junctions.push({ x, y });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Also scan entire grid for missed junctions
+        for (let y = 2; y < height - 2; y++) {
+            for (let x = 2; x < width - 2; x++) {
+                if (grid[y][x].type !== 'road') continue;
+
+                const key = `${x},${y}`;
+                if (checked.has(key)) continue;
+
+                // Count road connections
+                let connections = 0;
+                if (grid[y-1]?.[x]?.type === 'road') connections++;
+                if (grid[y+1]?.[x]?.type === 'road') connections++;
+                if (grid[y]?.[x-1]?.type === 'road') connections++;
+                if (grid[y]?.[x+1]?.type === 'road') connections++;
+
+                if (connections >= 3) {
+                    const tooClose = junctions.some(j =>
+                        Math.abs(j.x - x) < 4 && Math.abs(j.y - y) < 4
+                    );
+                    if (!tooClose) {
+                        junctions.push({ x, y });
+                    }
+                }
+            }
+        }
+
+        return junctions;
     }
 }
