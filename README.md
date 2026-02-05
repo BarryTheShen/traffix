@@ -1,3 +1,5 @@
+Live demo: https://traffix.mrking.io/
+
 # Traffix
 
 Traffix is a "0-player" traffic simulation focused on emergent traffic behavior in procedurally generated road networks. The primary uses are:
